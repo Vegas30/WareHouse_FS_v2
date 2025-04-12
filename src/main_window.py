@@ -1,4 +1,5 @@
-from PyQt6.QtWidgets import QMainWindow, QTabWidget, QStatusBar
+from PyQt6.QtWidgets import QMainWindow, QTabWidget, QStatusBar, QMenuBar, QMenu, QMessageBox
+from PyQt6.QtCore import QCoreApplication
 from database import Database
 from tabs.products_tab import ProductsTab
 from tabs.stock_tab import StockTab
@@ -20,8 +21,32 @@ class WarehouseApp(QMainWindow):
     def init_ui(self):
         self.setWindowTitle("Система управления складом")
         self.setGeometry(100, 100, 1200, 800)
+        self.setup_menu_bar()
         self.setup_tabs()
         self.setup_status_bar()
+
+    def setup_menu_bar(self):
+        menu_bar = QMenuBar(self)
+        self.setMenuBar(menu_bar)
+        
+        # Создаем меню
+        file_menu = menu_bar.addMenu("Файл")
+        help_menu = menu_bar.addMenu("Справка")
+        
+        # Действие "Выход"
+        exit_action = file_menu.addAction("Выход")
+        exit_action.triggered.connect(QCoreApplication.quit)
+        
+        # Действие "О программе"
+        about_action = help_menu.addAction("О программе")
+        about_action.triggered.connect(self.show_about_dialog)
+
+    def show_about_dialog(self):
+        QMessageBox.about(
+            self,
+            "О программе",
+            "Система управления складом v1.0\n\nРазработано для управления складскими операциями, товарами и поставщиками."
+        )
 
     def setup_status_bar(self):
         self.status_bar = QStatusBar()
