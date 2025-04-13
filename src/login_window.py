@@ -2,32 +2,25 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton,
     QMessageBox, QCheckBox, QHBoxLayout, QDialog, QFormLayout
 )
-from PyQt6.QtGui import QPixmap, QFont, QIcon, QColor, QLinearGradient, QBrush, QPalette
+from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt, pyqtSignal, QSettings
 from auth_service import AuthService
+from styles import LOGIN_STYLESHEET
 import os
 import logging
 
 class LoginWindow(QWidget):
-    login_success = pyqtSignal(str, bool)  # full_name, is_admin
+    login_success = pyqtSignal(str, bool)  # Сигнал успешной авторизации (передает имя пользователя и права администратора)
 
     def __init__(self):
         super().__init__()
         self.settings = QSettings("WarehouseSystem", "Auth")
         self.setWindowTitle("Система управления складом - Вход")
         self.setFixedSize(500, 600)
-        self.setup_background()
+        self.setObjectName("loginWidget")
         self.setup_ui()
+        self.setStyleSheet(LOGIN_STYLESHEET)
         self.load_saved_credentials()
-
-    def setup_background(self):
-        """Setup static background"""
-        palette = self.palette()
-        gradient = QLinearGradient(0, 0, 0, self.height())
-        gradient.setColorAt(0, QColor("#e8f5e9"))
-        gradient.setColorAt(1, QColor("#a5d6a7"))
-        palette.setBrush(QPalette.ColorRole.Window, QBrush(gradient))
-        self.setPalette(palette)
 
     def setup_ui(self):
         """Setup user interface"""
@@ -36,83 +29,55 @@ class LoginWindow(QWidget):
         main_layout.setSpacing(15)
         main_layout.setContentsMargins(30, 30, 30, 30)
 
-        # Logo
+        # Logo - Создание и настройка логотипа
         self.logo = QLabel()
         self.logo.setText("СКЛАД")
         self.logo.setFont(QFont("Arial", 32, QFont.Weight.Bold))
-        self.logo.setStyleSheet("color: #2e7d32;")
+        self.logo.setObjectName("loginLogo")
         self.logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Title
+        # Title - Создание и настройка заголовка
         self.title = QLabel("Авторизация")
-        self.title.setStyleSheet("""
-            QLabel {
-                color: #2e7d32;
-                font-size: 28px;
-                font-weight: bold;
-                margin-bottom: 20px;
-            }
-        """)
+        self.title.setObjectName("loginTitle")
         self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Input fields
+        # Input fields - Поля ввода
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Логин")
         self.username_input.setClearButtonEnabled(True)
-        self.username_input.setStyleSheet(self.get_input_style())
+        self.username_input.setObjectName("loginInput")
 
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("Пароль")
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_input.setClearButtonEnabled(True)
-        self.password_input.setStyleSheet(self.get_input_style())
+        self.password_input.setObjectName("loginInput")
 
-        # "Remember me" checkbox
+        # "Remember me" checkbox - Флажок "Запомнить меня"
         self.remember_check = QCheckBox("Запомнить меня")
-        self.remember_check.setStyleSheet("""
-            QCheckBox {
-                color: #2e7d32;
-                font-size: 14px;
-            }
-            QCheckBox::indicator {
-                width: 16px;
-                height: 16px;
-            }
-        """)
+        self.remember_check.setObjectName("rememberCheck")
 
-        # Login button
+        # Login button - Кнопка входа
         self.login_btn = QPushButton("Войти")
-        self.login_btn.setStyleSheet(self.get_button_style("#2e7d32", "#43a047", "#1b5e20"))
+        self.login_btn.setObjectName("loginButton")
 
-        # "Forgot password" button
+        # "Forgot password" button - Кнопка "Забыли пароль?"
         self.forgot_btn = QPushButton("Забыли пароль?")
-        self.forgot_btn.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                color: #2e7d32;
-                text-decoration: underline;
-                font-size: 12px;
-                min-width: 0;
-                padding: 0;
-            }
-            QPushButton:hover {
-                color: #43a047;
-            }
-        """)
+        self.forgot_btn.setObjectName("forgotButton")
 
-        # Footer
+        # Footer - Нижний колонтитул
         self.footer = QLabel("© 2025 Система управления складом. Все права защищены.")
-        self.footer.setStyleSheet("color: #888; font-size: 12px;")
+        self.footer.setObjectName("loginFooter")
         self.footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Assemble UI
+        # Assemble UI - Сборка интерфейса
         main_layout.addStretch(1)
         main_layout.addWidget(self.logo)
         main_layout.addWidget(self.title)
         main_layout.addWidget(self.username_input)
         main_layout.addWidget(self.password_input)
 
-        # Horizontal layout for checkbox and password recovery button
+        # Horizontal layout for checkbox and password recovery button - Горизонтальный макет для флажка и кнопки восстановления
         bottom_layout = QHBoxLayout()
         bottom_layout.addWidget(self.remember_check)
         bottom_layout.addStretch()
@@ -125,46 +90,9 @@ class LoginWindow(QWidget):
 
         self.setLayout(main_layout)
 
-        # Connect signals
+        # Connect signals - Подключение сигналов
         self.login_btn.clicked.connect(self.check_credentials)
         self.forgot_btn.clicked.connect(self.show_password_recovery_dialog)
-
-    def get_input_style(self):
-        return """
-            QLineEdit {
-                background-color: rgba(255,255,255,0.9);
-                border: 2px solid #a5d6a7;
-                border-radius: 15px;
-                padding: 12px;
-                font-size: 16px;
-                min-width: 280px;
-                selection-background-color: #81c784;
-            }
-            QLineEdit:focus {
-                border: 2px solid #2e7d32;
-                background-color: white;
-            }
-        """
-
-    def get_button_style(self, normal, hover, pressed):
-        return f"""
-            QPushButton {{
-                background-color: {normal};
-                color: white;
-                border-radius: 15px;
-                padding: 14px;
-                font-size: 16px;
-                font-weight: bold;
-                min-width: 280px;
-                border: none;
-            }}
-            QPushButton:hover {{
-                background-color: {hover};
-            }}
-            QPushButton:pressed {{
-                background-color: {pressed};
-            }}
-        """
 
     def check_credentials(self):
         username = self.username_input.text()
@@ -216,137 +144,92 @@ class PasswordRecoveryDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Восстановление пароля")
         self.setup_ui()
+        self.setStyleSheet(LOGIN_STYLESHEET)
 
     def setup_ui(self):
         layout = QVBoxLayout()
         layout.setSpacing(20)
         
-        # Title
+        # Title - Заголовок
         title = QLabel("Изменение пароля")
         title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
-        title.setStyleSheet("color: #2e7d32; margin-bottom: 10px;")
+        title.setObjectName("recoveryTitle")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        # Form layout for inputs
+        # Form layout for inputs - Макет формы для полей ввода
         form_layout = QFormLayout()
         form_layout.setSpacing(15)
         form_layout.setContentsMargins(10, 10, 10, 10)
         
-        # Username input
+        # Username input - Поле ввода логина
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Введите логин")
-        self.username_input.setStyleSheet("""
-            QLineEdit {
-                padding: 10px;
-                border: 1px solid #a5d6a7;
-                border-radius: 5px;
-                font-size: 14px;
-            }
-            QLineEdit:focus {
-                border: 1px solid #2e7d32;
-            }
-        """)
-        form_layout.addRow("Логин:", self.username_input)
+        self.username_input.setObjectName("recoveryInput")
         
-        # Current password input
+        # Create form labels with styles - Создание меток формы со стилями
+        username_label = QLabel("Логин:")
+        username_label.setObjectName("recoveryFormLabel")
+        
+        # Current password input - Поле ввода текущего пароля
         self.current_password = QLineEdit()
         self.current_password.setPlaceholderText("Введите текущий пароль")
         self.current_password.setEchoMode(QLineEdit.EchoMode.Password)
-        self.current_password.setStyleSheet("""
-            QLineEdit {
-                padding: 10px;
-                border: 1px solid #a5d6a7;
-                border-radius: 5px;
-                font-size: 14px;
-            }
-            QLineEdit:focus {
-                border: 1px solid #2e7d32;
-            }
-        """)
-        form_layout.addRow("Текущий пароль:", self.current_password)
+        self.current_password.setObjectName("recoveryInput")
         
-        # New password input
+        current_password_label = QLabel("Текущий пароль:")
+        current_password_label.setObjectName("recoveryFormLabel")
+        
+        # New password input - Поле ввода нового пароля
         self.new_password = QLineEdit()
         self.new_password.setPlaceholderText("Введите новый пароль")
         self.new_password.setEchoMode(QLineEdit.EchoMode.Password)
-        self.new_password.setStyleSheet("""
-            QLineEdit {
-                padding: 10px;
-                border: 1px solid #a5d6a7;
-                border-radius: 5px;
-                font-size: 14px;
-            }
-            QLineEdit:focus {
-                border: 1px solid #2e7d32;
-            }
-        """)
-        form_layout.addRow("Новый пароль:", self.new_password)
+        self.new_password.setObjectName("recoveryInput")
         
-        # Buttons layout
-        buttons_layout = QHBoxLayout()
+        new_password_label = QLabel("Новый пароль:")
+        new_password_label.setObjectName("recoveryFormLabel")
         
-        # Cancel button
+        # Add to form layout - Добавление элементов в макет формы
+        form_layout.addRow(username_label, self.username_input)
+        form_layout.addRow(current_password_label, self.current_password)
+        form_layout.addRow(new_password_label, self.new_password)
+        
+        # Button layout - Макет для кнопок
+        btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(10)
+        
+        # Cancel button - Кнопка отмены
         self.cancel_btn = QPushButton("Отмена")
-        self.cancel_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #e0e0e0;
-                border-radius: 5px;
-                padding: 10px 15px;
-                font-size: 14px;
-                min-width: 100px;
-            }
-            QPushButton:hover {
-                background-color: #d0d0d0;
-            }
-        """)
+        self.cancel_btn.setObjectName("loginButton")
         
-        # Submit button
+        # Submit button - Кнопка подтверждения
         self.submit_btn = QPushButton("Изменить пароль")
-        self.submit_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #2e7d32;
-                color: white;
-                border-radius: 5px;
-                padding: 10px 15px;
-                font-size: 14px;
-                min-width: 150px;
-            }
-            QPushButton:hover {
-                background-color: #43a047;
-            }
-        """)
+        self.submit_btn.setObjectName("loginButton")
         
-        buttons_layout.addWidget(self.cancel_btn)
-        buttons_layout.addWidget(self.submit_btn)
+        btn_layout.addWidget(self.cancel_btn)
+        btn_layout.addWidget(self.submit_btn)
         
-        # Add all layouts to main layout
+        # Add layouts to main layout - Добавление макетов в основной макет
         layout.addWidget(title)
         layout.addLayout(form_layout)
-        layout.addLayout(buttons_layout)
+        layout.addLayout(btn_layout)
         
         self.setLayout(layout)
-        self.resize(400, 300)
         
-        # Connect signals
+        # Connect signals - Подключение сигналов
         self.cancel_btn.clicked.connect(self.reject)
         self.submit_btn.clicked.connect(self.change_password)
-    
+        
     def change_password(self):
         username = self.username_input.text()
         current_password = self.current_password.text()
         new_password = self.new_password.text()
         
         if not username or not current_password or not new_password:
-            QMessageBox.warning(self, "Ошибка", "Пожалуйста, заполните все поля")
+            QMessageBox.warning(self, "Ошибка", "Заполните все поля")
             return
-        
-        if current_password == new_password:
-            QMessageBox.warning(self, "Ошибка", "Новый пароль не должен совпадать с текущим")
-            return
-        
-        success = AuthService.change_password(username, current_password, new_password)
-        
-        if success:
+            
+        # Validate current password and change to new password - Проверка текущего пароля и изменение на новый
+        if AuthService.change_password(username, current_password, new_password):
             self.accept()
         else:
-            QMessageBox.warning(self, "Ошибка", "Не удалось изменить пароль. Проверьте введенные данные.") 
+            QMessageBox.warning(self, "Ошибка", "Неверный логин или пароль") 

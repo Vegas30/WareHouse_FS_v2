@@ -7,6 +7,9 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QDate
 from PyQt6.QtGui import QIcon
 import logging
+from data_export import DataExporter
+from validators import Validator
+from visualization import InventoryAnalysisDialog
 
 class StockTab(QWidget):
     """
@@ -24,6 +27,7 @@ class StockTab(QWidget):
         self.db = db
         self.init_ui()
         self.load_stock()
+        self.check_low_stock_alert()
 
     def init_ui(self):
         """Initialize the user interface."""
@@ -43,6 +47,12 @@ class StockTab(QWidget):
         self.warehouse_filter.addItem("Все склады", None)
         self.load_warehouses()
         
+        # Category filter
+        self.category_filter = QComboBox()
+        self.category_filter.setMinimumWidth(150)
+        self.category_filter.addItem("Все категории", None)
+        self.load_categories()
+        
         # Search field
         self.search = QLineEdit()
         self.search.setPlaceholderText("Поиск товара...")
@@ -56,6 +66,8 @@ class StockTab(QWidget):
         top_panel.addWidget(self.btn_move)
         top_panel.addWidget(QLabel("Склад:"))
         top_panel.addWidget(self.warehouse_filter)
+        top_panel.addWidget(QLabel("Категория:"))
+        top_panel.addWidget(self.category_filter)
         top_panel.addItem(spacer)
         top_panel.addWidget(self.search)
 
@@ -82,27 +94,36 @@ class StockTab(QWidget):
         # Report button
         self.btn_report = QPushButton("Отчет")
         self.btn_report.setIcon(QIcon.fromTheme("x-office-document"))
+        
+        # Analysis button
+        self.btn_analysis = QPushButton("Анализ запасов")
+        self.btn_analysis.setIcon(QIcon.fromTheme("accessories-calculator"))
 
         # Add buttons to left panel
         left_button_panel.addWidget(self.btn_refresh)
         left_button_panel.addWidget(self.btn_report)
+        left_button_panel.addWidget(self.btn_analysis)
         left_button_panel.addStretch()
 
-        # Right side of bottom panel - export button and low stock warning
+        # Right side of bottom panel - export buttons and low stock warning
         right_button_panel = QHBoxLayout()
         
         # Low stock warning
         self.low_stock_label = QLabel("Товары с низким запасом: 0")
         self.low_stock_label.setStyleSheet("color: #d32f2f; font-weight: bold;")
         
-        # Export button
-        self.btn_export = QPushButton("Экспорт")
-        self.btn_export.setIcon(QIcon.fromTheme("document-save"))
+        # Export buttons
+        self.btn_export_csv = QPushButton("Экспорт в CSV")
+        self.btn_export_csv.setIcon(QIcon.fromTheme("document-save"))
+        
+        self.btn_export_excel = QPushButton("Экспорт в Excel")
+        self.btn_export_excel.setIcon(QIcon.fromTheme("x-office-spreadsheet"))
 
         # Add elements to right panel
         right_button_panel.addWidget(self.low_stock_label)
         right_button_panel.addStretch()
-        right_button_panel.addWidget(self.btn_export)
+        right_button_panel.addWidget(self.btn_export_csv)
+        right_button_panel.addWidget(self.btn_export_excel)
 
         # Assemble bottom panel from left and right parts
         bottom_panel.addLayout(left_button_panel, stretch=1)
@@ -121,60 +142,90 @@ class StockTab(QWidget):
         self.btn_move.clicked.connect(self.move_stock)
         self.btn_refresh.clicked.connect(self.load_stock)
         self.btn_report.clicked.connect(self.generate_report)
-        self.btn_export.clicked.connect(self.export_data)
+        self.btn_export_csv.clicked.connect(self.export_to_csv)
+        self.btn_export_excel.clicked.connect(self.export_to_excel)
+        self.btn_analysis.clicked.connect(self.show_analysis)
         self.search.textChanged.connect(self.handle_search)
         self.warehouse_filter.currentIndexChanged.connect(self.load_stock)
+        self.category_filter.currentIndexChanged.connect(self.load_stock)
 
     def load_warehouses(self):
         """Load warehouses for filter dropdown."""
         try:
             query = "SELECT warehouse_id, warehouse_name FROM warehouses ORDER BY warehouse_name"
-            warehouses = self.db.fetch_all(query)
+            warehouses = self.db.fetch_all(query, parent_widget=self)
             
             for warehouse_id, warehouse_name in warehouses:
                 self.warehouse_filter.addItem(warehouse_name, warehouse_id)
                 
         except Exception as e:
             logging.error(f"Error loading warehouses: {str(e)}")
+    
+    def load_categories(self):
+        """Load product categories for filter dropdown."""
+        try:
+            query = "SELECT DISTINCT category FROM products ORDER BY category"
+            categories = self.db.fetch_all(query, parent_widget=self)
+            
+            for category in categories:
+                self.category_filter.addItem(category[0], category[0])
+                
+        except Exception as e:
+            logging.error(f"Error loading categories: {str(e)}")
 
     def load_stock(self):
         """Load stock data from database and display in table."""
         try:
             selected_warehouse = self.warehouse_filter.currentData()
+            selected_category = self.category_filter.currentData()
+            search_text = self.search.text()
             
+            # Base query
+            query = """
+                SELECT s.stock_id, p.product_name, w.warehouse_name, s.quantity, 
+                       s.last_restocked, p.category, p.unit_price
+                FROM stock s
+                JOIN products p ON s.product_id = p.product_id
+                JOIN warehouses w ON s.warehouse_id = w.warehouse_id
+                WHERE 1=1
+            """
+            params = []
+            
+            # Add warehouse filter if selected
             if selected_warehouse:
-                query = """
-                    SELECT s.stock_id, p.product_name, w.warehouse_name, s.quantity, 
-                           s.last_restocked, p.category, p.unit_price
-                    FROM stock s
-                    JOIN products p ON s.product_id = p.product_id
-                    JOIN warehouses w ON s.warehouse_id = w.warehouse_id
-                    WHERE s.warehouse_id = %s
-                    ORDER BY p.product_name
-                """
-                stock_data = self.db.fetch_all(query, (selected_warehouse,))
-            else:
-                query = """
-                    SELECT s.stock_id, p.product_name, w.warehouse_name, s.quantity, 
-                           s.last_restocked, p.category, p.unit_price
-                    FROM stock s
-                    JOIN products p ON s.product_id = p.product_id
-                    JOIN warehouses w ON s.warehouse_id = w.warehouse_id
-                    ORDER BY p.product_name
-                """
-                stock_data = self.db.fetch_all(query)
+                query += " AND s.warehouse_id = %s"
+                params.append(selected_warehouse)
+            
+            # Add category filter if selected
+            if selected_category:
+                query += " AND p.category = %s"
+                params.append(selected_category)
+            
+            # Add search filter if provided
+            if search_text:
+                # Sanitize input for search
+                search_text = Validator.sanitize_input(search_text)
+                query += " AND (p.product_name ILIKE %s OR p.category ILIKE %s)"
+                params.extend([f"%{search_text}%", f"%{search_text}%"])
+            
+            # Add ordering
+            query += " ORDER BY p.product_name"
+            
+            # Execute query
+            stock_data = self.db.fetch_all(query, params, parent_widget=self)
 
             self.stock_table.setRowCount(len(stock_data))
             
             low_stock_count = 0
+            low_stock_threshold = 10  # Configure low stock threshold
             
             for row_idx, stock_item in enumerate(stock_data):
                 for col_idx, data in enumerate(stock_item):
                     item = QTableWidgetItem(str(data))
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                     
-                    # Highlight low stock items (less than 10 units)
-                    if col_idx == 3 and int(data) < 10:
+                    # Highlight low stock items
+                    if col_idx == 3 and int(data) < low_stock_threshold:
                         item.setForeground(Qt.GlobalColor.red)
                         low_stock_count += 1
                         
@@ -183,178 +234,332 @@ class StockTab(QWidget):
             # Update low stock warning
             self.low_stock_label.setText(f"Товары с низким запасом: {low_stock_count}")
             
+            # Check if low stock alert is needed
+            if low_stock_count > 0:
+                self.low_stock_label.setStyleSheet("color: #d32f2f; font-weight: bold;")
+            else:
+                self.low_stock_label.setStyleSheet("color: #2e7d32; font-weight: bold;")
+            
         except Exception as e:
             logging.error(f"Error loading stock: {str(e)}")
             QMessageBox.critical(self, "Ошибка", "Не удалось загрузить данные о запасах")
 
     def handle_search(self):
-        """Handle stock search by product name."""
+        """Handle stock search by product name or category."""
+        self.load_stock()
+
+    def check_low_stock_alert(self):
+        """Check if there are items with critically low stock and show an alert."""
         try:
-            search_text = self.search.text()
-            selected_warehouse = self.warehouse_filter.currentData()
+            # Define critical threshold (can be configurable)
+            critical_threshold = 5
             
-            if selected_warehouse:
-                query = """
-                    SELECT s.stock_id, p.product_name, w.warehouse_name, s.quantity, 
-                           s.last_restocked, p.category, p.unit_price
-                    FROM stock s
-                    JOIN products p ON s.product_id = p.product_id
-                    JOIN warehouses w ON s.warehouse_id = w.warehouse_id
-                    WHERE s.warehouse_id = %s AND p.product_name ILIKE %s
-                    ORDER BY p.product_name
-                """
-                stock_data = self.db.fetch_all(query, (selected_warehouse, f"%{search_text}%"))
-            else:
-                query = """
-                    SELECT s.stock_id, p.product_name, w.warehouse_name, s.quantity, 
-                           s.last_restocked, p.category, p.unit_price
-                    FROM stock s
-                    JOIN products p ON s.product_id = p.product_id
-                    JOIN warehouses w ON s.warehouse_id = w.warehouse_id
-                    WHERE p.product_name ILIKE %s
-                    ORDER BY p.product_name
-                """
-                stock_data = self.db.fetch_all(query, (f"%{search_text}%",))
+            query = """
+                SELECT p.product_name, w.warehouse_name, s.quantity
+                FROM stock s
+                JOIN products p ON s.product_id = p.product_id
+                JOIN warehouses w ON s.warehouse_id = w.warehouse_id
+                WHERE s.quantity < %s
+                ORDER BY s.quantity
+            """
             
-            self.stock_table.setRowCount(len(stock_data))
+            critical_items = self.db.fetch_all(query, (critical_threshold,), parent_widget=self)
             
-            for row_idx, stock_item in enumerate(stock_data):
-                for col_idx, data in enumerate(stock_item):
-                    item = QTableWidgetItem(str(data))
-                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                    
-                    # Highlight low stock items (less than 10 units)
-                    if col_idx == 3 and int(data) < 10:
-                        item.setForeground(Qt.GlobalColor.red)
-                        
-                    self.stock_table.setItem(row_idx, col_idx, item)
-                    
+            if critical_items:
+                alert_message = "Внимание! Критически низкий уровень запасов:\n\n"
+                
+                for item in critical_items:
+                    product_name, warehouse_name, quantity = item
+                    alert_message += f"• {product_name} ({warehouse_name}): {quantity} шт.\n"
+                
+                QMessageBox.warning(self, "Низкий уровень запасов", alert_message)
+        
         except Exception as e:
-            logging.error(f"Error searching stock: {str(e)}")
+            logging.error(f"Error checking low stock: {str(e)}")
 
     def add_stock(self):
-        """Show dialog to add stock for a product."""
+        """Open dialog to add new stock item."""
         dialog = AddStockDialog(self, self.db)
-        if dialog.exec():
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             self.load_stock()
 
     def update_stock(self):
-        """Update quantity for selected stock item."""
-        selected_rows = self.stock_table.selectedItems()
-        if not selected_rows:
-            QMessageBox.warning(self, "Внимание", "Выберите запись для обновления")
-            return
+        """Update stock quantity for selected item."""
+        selected_row = self.stock_table.currentRow()
+        
+        if selected_row >= 0:
+            stock_id = self.stock_table.item(selected_row, 0).text()
+            product_name = self.stock_table.item(selected_row, 1).text()
+            current_quantity = int(self.stock_table.item(selected_row, 3).text())
             
-        row = selected_rows[0].row()
-        stock_id = self.stock_table.item(row, 0).text()
-        product_name = self.stock_table.item(row, 1).text()
-        current_quantity = self.stock_table.item(row, 3).text()
-            
-        dialog = UpdateStockDialog(self, product_name, int(current_quantity))
-        if dialog.exec():
-            new_quantity = dialog.get_quantity()
-            try:
-                query = """
-                    UPDATE stock 
-                    SET quantity = %s, 
-                        last_restocked = CURRENT_DATE,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE stock_id = %s
-                """
-                success = self.db.execute_query(query, (new_quantity, stock_id))
-                if success:
-                    self.load_stock()
-                    QMessageBox.information(self, "Успех", f"Количество товара '{product_name}' обновлено")
-                else:
-                    QMessageBox.warning(self, "Ошибка", "Не удалось обновить запас")
-            except Exception as e:
-                logging.error(f"Error updating stock: {str(e)}")
-                QMessageBox.critical(self, "Ошибка", f"Не удалось обновить запас: {str(e)}")
+            dialog = UpdateStockDialog(self, product_name, current_quantity)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                new_quantity = dialog.get_quantity()
+                
+                try:
+                    query = """
+                        UPDATE stock 
+                        SET quantity = %s, last_restocked = CURRENT_DATE
+                        WHERE stock_id = %s
+                    """
+                    
+                    success = self.db.execute_query(query, (new_quantity, stock_id), parent_widget=self)
+                    
+                    if success:
+                        self.load_stock()
+                        QMessageBox.information(self, "Успех", "Количество товара обновлено")
+                
+                except Exception as e:
+                    logging.error(f"Error updating stock: {str(e)}")
+                    QMessageBox.critical(self, "Ошибка", "Не удалось обновить количество товара")
+        else:
+            QMessageBox.warning(self, "Предупреждение", "Выберите товар для обновления")
 
     def move_stock(self):
         """Move stock from one warehouse to another."""
-        selected_rows = self.stock_table.selectedItems()
-        if not selected_rows:
-            QMessageBox.warning(self, "Внимание", "Выберите запись для перемещения")
-            return
+        selected_row = self.stock_table.currentRow()
+        
+        if selected_row >= 0:
+            stock_id = self.stock_table.item(selected_row, 0).text()
+            product_name = self.stock_table.item(selected_row, 1).text()
+            source_warehouse = self.stock_table.item(selected_row, 2).text()
+            current_quantity = int(self.stock_table.item(selected_row, 3).text())
             
-        row = selected_rows[0].row()
-        stock_id = self.stock_table.item(row, 0).text()
-        product_name = self.stock_table.item(row, 1).text()
-        current_warehouse = self.stock_table.item(row, 2).text()
-        current_quantity = int(self.stock_table.item(row, 3).text())
-            
-        dialog = MoveStockDialog(self, self.db, product_name, current_warehouse, current_quantity)
-        if dialog.exec():
-            move_data = dialog.get_move_data()
-            
-            if move_data["quantity"] <= 0:
-                QMessageBox.warning(self, "Внимание", "Количество должно быть больше 0")
-                return
+            dialog = MoveStockDialog(self, self.db, product_name, source_warehouse, current_quantity)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                target_warehouse_id, quantity_to_move = dialog.get_move_data()
                 
-            if move_data["quantity"] > current_quantity:
-                QMessageBox.warning(self, "Внимание", "Недостаточно товара для перемещения")
-                return
+                if quantity_to_move > current_quantity:
+                    QMessageBox.warning(self, "Предупреждение", "Нельзя переместить больше товара, чем имеется на складе")
+                    return
                 
-            try:
-                # Check if product already exists in target warehouse
-                check_query = """
-                    SELECT stock_id, quantity 
-                    FROM stock 
-                    WHERE product_id = (SELECT product_id FROM stock WHERE stock_id = %s)
-                    AND warehouse_id = %s
-                """
-                target_stock = self.db.fetch_one(check_query, (stock_id, move_data["target_warehouse_id"]))
-                
-                # Begin transaction
-                self.db.execute_query("BEGIN")
-                
-                # Decrease quantity in source warehouse
-                update_source_query = """
-                    UPDATE stock 
-                    SET quantity = quantity - %s,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE stock_id = %s
-                """
-                self.db.execute_query(update_source_query, (move_data["quantity"], stock_id))
-                
-                if target_stock:
-                    # If product exists in target warehouse, update quantity
-                    update_target_query = """
+                try:
+                    # Get product_id from the selected stock item
+                    query = "SELECT product_id FROM stock WHERE stock_id = %s"
+                    product_id = self.db.fetch_one(query, (stock_id,), parent_widget=self)[0]
+                    
+                    # Update source warehouse quantity
+                    query = """
                         UPDATE stock 
-                        SET quantity = quantity + %s,
-                            updated_at = CURRENT_TIMESTAMP
+                        SET quantity = quantity - %s
                         WHERE stock_id = %s
                     """
-                    self.db.execute_query(update_target_query, (move_data["quantity"], target_stock[0]))
-                else:
-                    # If product doesn't exist in target warehouse, create new stock record
-                    insert_query = """
-                        INSERT INTO stock (product_id, warehouse_id, quantity, last_restocked)
-                        SELECT product_id, %s, %s, CURRENT_DATE
-                        FROM stock
-                        WHERE stock_id = %s
+                    self.db.execute_query(query, (quantity_to_move, stock_id), parent_widget=self)
+                    
+                    # Check if the product already exists in the target warehouse
+                    query = """
+                        SELECT stock_id, quantity 
+                        FROM stock 
+                        WHERE product_id = %s AND warehouse_id = %s
                     """
-                    self.db.execute_query(insert_query, (move_data["target_warehouse_id"], move_data["quantity"], stock_id))
+                    target_stock = self.db.fetch_one(query, (product_id, target_warehouse_id), parent_widget=self)
+                    
+                    if target_stock:
+                        # Product exists in target warehouse, update quantity
+                        target_stock_id, target_quantity = target_stock
+                        query = """
+                            UPDATE stock 
+                            SET quantity = quantity + %s
+                            WHERE stock_id = %s
+                        """
+                        self.db.execute_query(query, (quantity_to_move, target_stock_id), parent_widget=self)
+                    else:
+                        # Product doesn't exist in target warehouse, insert new record
+                        query = """
+                            INSERT INTO stock (product_id, warehouse_id, quantity, last_restocked)
+                            VALUES (%s, %s, %s, CURRENT_DATE)
+                        """
+                        self.db.execute_query(query, (product_id, target_warehouse_id, quantity_to_move), parent_widget=self)
+                    
+                    self.load_stock()
+                    QMessageBox.information(self, "Успех", f"Товар успешно перемещен ({quantity_to_move} шт.)")
                 
-                # Commit transaction
-                self.db.execute_query("COMMIT")
-                
-                self.load_stock()
-                QMessageBox.information(self, "Успех", f"Товар '{product_name}' успешно перемещен")
-                
-            except Exception as e:
-                self.db.execute_query("ROLLBACK")
-                logging.error(f"Error moving stock: {str(e)}")
-                QMessageBox.critical(self, "Ошибка", f"Не удалось переместить товар: {str(e)}")
-
+                except Exception as e:
+                    logging.error(f"Error moving stock: {str(e)}")
+                    QMessageBox.critical(self, "Ошибка", "Не удалось переместить товар")
+        else:
+            QMessageBox.warning(self, "Предупреждение", "Выберите товар для перемещения")
+    
     def generate_report(self):
         """Generate stock report."""
-        QMessageBox.information(self, "Отчет", "Функция отчета пока не реализована")
+        try:
+            selected_warehouse = self.warehouse_filter.currentData()
+            selected_category = self.category_filter.currentData()
+            
+            title = "Отчет по запасам"
+            message = "Сводная информация по запасам:\n\n"
+            
+            # Query for total stock value
+            value_query = """
+                SELECT SUM(p.unit_price * s.quantity) as total_value
+                FROM stock s
+                JOIN products p ON s.product_id = p.product_id
+                WHERE 1=1
+            """
+            
+            # Query for stock by category
+            category_query = """
+                SELECT p.category, SUM(s.quantity) as total_quantity
+                FROM stock s
+                JOIN products p ON s.product_id = p.product_id
+                WHERE 1=1
+            """
+            
+            # Query for low stock items
+            low_stock_query = """
+                SELECT COUNT(*) 
+                FROM stock s
+                JOIN products p ON s.product_id = p.product_id
+                WHERE s.quantity < 10
+            """
+            
+            params = []
+            
+            # Add warehouse filter if selected
+            if selected_warehouse:
+                value_query += " AND s.warehouse_id = %s"
+                category_query += " AND s.warehouse_id = %s"
+                low_stock_query += " AND s.warehouse_id = %s"
+                params.append(selected_warehouse)
+            
+            # Add category filter if selected
+            if selected_category:
+                value_query += " AND p.category = %s"
+                category_query += " AND p.category = %s"
+                low_stock_query += " AND p.category = %s"
+                params.append(selected_category)
+            
+            # Finalize category query
+            category_query += " GROUP BY p.category ORDER BY total_quantity DESC"
+            
+            # Get total stock value
+            total_value = self.db.fetch_one(value_query, params, parent_widget=self)
+            if total_value and total_value[0]:
+                message += f"Общая стоимость запасов: {total_value[0]:.2f} руб.\n\n"
+            
+            # Get stock by category
+            categories = self.db.fetch_all(category_query, params, parent_widget=self)
+            if categories:
+                message += "Распределение по категориям:\n"
+                for category, quantity in categories:
+                    message += f"• {category}: {quantity} шт.\n"
+                message += "\n"
+            
+            # Get low stock count
+            low_stock_count = self.db.fetch_one(low_stock_query, params, parent_widget=self)
+            if low_stock_count:
+                message += f"Товаров с низким запасом: {low_stock_count[0]}\n"
+            
+            QMessageBox.information(self, title, message)
+            
+        except Exception as e:
+            logging.error(f"Error generating report: {str(e)}")
+            QMessageBox.critical(self, "Ошибка", "Не удалось сформировать отчет")
 
-    def export_data(self):
-        """Export stock data."""
-        QMessageBox.information(self, "Экспорт", "Функция экспорта пока не реализована")
+    def export_to_csv(self):
+        """Export stock data to CSV file."""
+        try:
+            selected_warehouse = self.warehouse_filter.currentData()
+            selected_category = self.category_filter.currentData()
+            search_text = self.search.text()
+            
+            # Base query
+            query = """
+                SELECT p.product_name, w.warehouse_name, s.quantity, 
+                       s.last_restocked, p.category, p.unit_price
+                FROM stock s
+                JOIN products p ON s.product_id = p.product_id
+                JOIN warehouses w ON s.warehouse_id = w.warehouse_id
+                WHERE 1=1
+            """
+            params = []
+            
+            # Add warehouse filter if selected
+            if selected_warehouse:
+                query += " AND s.warehouse_id = %s"
+                params.append(selected_warehouse)
+            
+            # Add category filter if selected
+            if selected_category:
+                query += " AND p.category = %s"
+                params.append(selected_category)
+            
+            # Add search filter if provided
+            if search_text:
+                search_text = Validator.sanitize_input(search_text)
+                query += " AND (p.product_name ILIKE %s OR p.category ILIKE %s)"
+                params.extend([f"%{search_text}%", f"%{search_text}%"])
+            
+            # Add ordering
+            query += " ORDER BY p.product_name"
+            
+            # Define headers
+            headers = ["Товар", "Склад", "Количество", "Последнее пополнение", "Категория", "Цена за ед."]
+            
+            # Export data
+            exporter = DataExporter(self)
+            exporter.export_to_csv(query, params, headers=headers)
+            
+        except Exception as e:
+            logging.error(f"Error exporting to CSV: {str(e)}")
+            QMessageBox.critical(self, "Ошибка", "Не удалось экспортировать данные в CSV")
+    
+    def export_to_excel(self):
+        """Export stock data to Excel file."""
+        try:
+            selected_warehouse = self.warehouse_filter.currentData()
+            selected_category = self.category_filter.currentData()
+            search_text = self.search.text()
+            
+            # Base query
+            query = """
+                SELECT p.product_name, w.warehouse_name, s.quantity, 
+                       s.last_restocked, p.category, p.unit_price
+                FROM stock s
+                JOIN products p ON s.product_id = p.product_id
+                JOIN warehouses w ON s.warehouse_id = w.warehouse_id
+                WHERE 1=1
+            """
+            params = []
+            
+            # Add warehouse filter if selected
+            if selected_warehouse:
+                query += " AND s.warehouse_id = %s"
+                params.append(selected_warehouse)
+            
+            # Add category filter if selected
+            if selected_category:
+                query += " AND p.category = %s"
+                params.append(selected_category)
+            
+            # Add search filter if provided
+            if search_text:
+                search_text = Validator.sanitize_input(search_text)
+                query += " AND (p.product_name ILIKE %s OR p.category ILIKE %s)"
+                params.extend([f"%{search_text}%", f"%{search_text}%"])
+            
+            # Add ordering
+            query += " ORDER BY p.product_name"
+            
+            # Define headers
+            headers = ["Товар", "Склад", "Количество", "Последнее пополнение", "Категория", "Цена за ед."]
+            
+            # Export data
+            exporter = DataExporter(self)
+            exporter.export_to_excel(query, params, headers=headers, sheet_name="Запасы")
+            
+        except Exception as e:
+            logging.error(f"Error exporting to Excel: {str(e)}")
+            QMessageBox.critical(self, "Ошибка", "Не удалось экспортировать данные в Excel")
+    
+    def show_analysis(self):
+        """Show inventory analysis dialog with visualizations."""
+        try:
+            dialog = InventoryAnalysisDialog(self)
+            dialog.exec()
+        except Exception as e:
+            logging.error(f"Error showing analysis: {str(e)}")
+            QMessageBox.critical(self, "Ошибка", "Не удалось открыть анализ запасов")
 
 
 class AddStockDialog(QDialog):
