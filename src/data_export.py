@@ -174,19 +174,30 @@ class DataImporter:
             # Читаем данные из CSV файла
             with open(filename, 'r', encoding='utf-8') as csvfile:
                 csv_reader = csv.reader(csvfile, delimiter=delimiter)
-                
-                # Первая строка - заголовки
                 headers = next(csv_reader)
+
+                # Получаем заголовки и формируем запрос для вставки
+                if table_name == "products":  # Товары
+                    headers = ["product_name", "product_description", "category", "unit_price"]
+                elif table_name == "stock":  # Запасы
+                    headers = ["stock_id", "product_id", "warehouse_id", "quantity"]
+                elif table_name == "orders":  # Заказы
+                    headers = ["order_id", "order_date", "supplier_id", "total_amount", "status"]
+                elif table_name == "suppliers":  # Поставщики
+                    headers = ["supplier_id", "supplier_name", "contact_person", "phone_number", "email"]
+                elif table_name == "warehouses":  # Склады
+                    headers = ["warehouse_id", "warehouse_name", "location", "capacity"]
                 
-                # Формируем запрос для вставки
                 placeholders = ', '.join(['%s'] * len(headers))
                 columns = ', '.join(headers)
                 query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
                 
-                # Импортируем данные построчно
+                # # Импортируем данные построчно
                 for row in csv_reader:
-                    self.db.execute_query(query, row, self.parent)
+                    values = row
+                    self.db.execute_query(query, values, self.parent)
             
+            # Сообщение об успешном импорте только после успешного завершения всех операций
             QMessageBox.information(
                 self.parent, 
                 "Импорт данных", 
@@ -228,7 +239,19 @@ class DataImporter:
             df = pd.read_excel(filename, sheet_name=sheet_name)
             
             # Получаем заголовки и формируем запрос для вставки
-            headers = df.columns.tolist()
+            # headers = df.columns.tolist()
+            if table_name == "products":  # Товары
+                headers = ["product_name", "product_description", "category", "unit_price"]
+            elif table_name == "stock":  # Запасы
+                headers = ["stock_id", "product_id", "warehouse_id", "quantity"]
+            elif table_name == "orders":  # Заказы
+                headers = ["order_id", "order_date", "supplier_id", "total_amount", "status"]
+            elif table_name == "suppliers":  # Поставщики
+                headers = ["supplier_id", "supplier_name", "contact_person", "phone_number", "email"]
+            elif table_name == "warehouses":  # Склады
+                headers = ["warehouse_id", "warehouse_name", "location", "capacity"]
+
+
             placeholders = ', '.join(['%s'] * len(headers))
             columns = ', '.join(headers)
             query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
