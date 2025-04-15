@@ -1,10 +1,18 @@
+# Импорт модуля для работы с CSV файлами
 import csv
+# Импорт модуля для работы с JSON
 import json
+# Импорт библиотеки для работы с данными
 import pandas as pd
+# Импорт модуля для работы с операционной системой
 import os
+# Импорт необходимых виджетов из PyQt6
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
+# Импорт класса для работы с базой данных
 from database import Database
+# Импорт модуля для логирования
 import logging
+# Импорт модуля для работы с датами
 import datetime
 
 class DataExporter:
@@ -17,7 +25,9 @@ class DataExporter:
         Args:
             parent_widget: Родительский виджет для диалогов
         """
+        # Создание объекта базы данных
         self.db = Database()
+        # Сохранение ссылки на родительский виджет
         self.parent = parent_widget
     
     def export_to_csv(self, query, params=None, filename=None, headers=None):
@@ -34,36 +44,43 @@ class DataExporter:
             bool: Успешность экспорта
         """
         try:
-            # Получаем данные
+            # Получение данных из базы данных
             data = self.db.fetch_all(query, params, self.parent)
+            # Проверка наличия данных для экспорта
             if not data:
+                # Показать предупреждение, если данных нет
                 QMessageBox.warning(self.parent, "Экспорт данных", "Нет данных для экспорта")
                 return False
             
-            # Если имя файла не указано, запрашиваем через диалог
+            # Если имя файла не указано, запрашиваем его через диалог
             if not filename:
+                # Формирование имени файла по умолчанию с текущей датой и временем
                 default_name = f"export_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                # Отображение диалога сохранения файла
                 filename, _ = QFileDialog.getSaveFileName(
                     self.parent,
                     "Экспорт данных в CSV",
                     default_name,
                     "CSV Files (*.csv)"
                 )
-                if not filename:  # Пользователь отменил диалог
+                # Проверка, не отменил ли пользователь диалог
+                if not filename:
                     return False
             
-            # Записываем данные в CSV файл
+            # Открытие файла для записи
             with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+                # Создание объекта для записи в CSV
                 writer = csv.writer(csvfile)
                 
-                # Записываем заголовки, если указаны
+                # Запись заголовков, если они указаны
                 if headers:
                     writer.writerow(headers)
                 
-                # Записываем данные
+                # Запись данных построчно
                 for row in data:
                     writer.writerow(row)
             
+            # Показать сообщение об успешном экспорте
             QMessageBox.information(
                 self.parent, 
                 "Экспорт данных", 
@@ -72,8 +89,10 @@ class DataExporter:
             return True
             
         except Exception as e:
+            # Логирование ошибки экспорта
             error_msg = f"Ошибка при экспорте данных в CSV: {str(e)}"
             logging.error(error_msg)
+            # Показать сообщение об ошибке
             QMessageBox.critical(self.parent, "Ошибка экспорта", error_msg)
             return False
     
@@ -92,34 +111,40 @@ class DataExporter:
             bool: Успешность экспорта
         """
         try:
-            # Получаем данные
+            # Получение данных из базы данных
             data = self.db.fetch_all(query, params, self.parent)
+            # Проверка наличия данных для экспорта
             if not data:
+                # Показать предупреждение, если данных нет
                 QMessageBox.warning(self.parent, "Экспорт данных", "Нет данных для экспорта")
                 return False
             
-            # Если имя файла не указано, запрашиваем через диалог
+            # Если имя файла не указано, запрашиваем его через диалог
             if not filename:
+                # Формирование имени файла по умолчанию с текущей датой и временем
                 default_name = f"export_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                # Отображение диалога сохранения файла
                 filename, _ = QFileDialog.getSaveFileName(
                     self.parent,
                     "Экспорт данных в Excel",
                     default_name,
                     "Excel Files (*.xlsx)"
                 )
-                if not filename:  # Пользователь отменил диалог
+                # Проверка, не отменил ли пользователь диалог
+                if not filename:
                     return False
             
-            # Создаем DataFrame из данных
+            # Создание DataFrame из полученных данных
             df = pd.DataFrame(data)
             
-            # Устанавливаем заголовки, если указаны
+            # Установка заголовков, если они указаны
             if headers:
                 df.columns = headers
             
-            # Сохраняем в Excel
+            # Сохранение данных в Excel файл
             df.to_excel(filename, sheet_name=sheet_name, index=False)
             
+            # Показать сообщение об успешном экспорте
             QMessageBox.information(
                 self.parent, 
                 "Экспорт данных", 
@@ -128,8 +153,10 @@ class DataExporter:
             return True
             
         except Exception as e:
+            # Логирование ошибки экспорта
             error_msg = f"Ошибка при экспорте данных в Excel: {str(e)}"
             logging.error(error_msg)
+            # Показать сообщение об ошибке
             QMessageBox.critical(self.parent, "Ошибка экспорта", error_msg)
             return False
 
@@ -144,7 +171,9 @@ class DataImporter:
         Args:
             parent_widget: Родительский виджет для диалогов
         """
+        # Создание объекта базы данных
         self.db = Database()
+        # Сохранение ссылки на родительский виджет
         self.parent = parent_widget
     
     def import_from_csv(self, table_name, filename=None, delimiter=','):
@@ -160,23 +189,27 @@ class DataImporter:
             bool: Успешность импорта
         """
         try:
-            # Если имя файла не указано, запрашиваем через диалог
+            # Если имя файла не указано, запрашиваем его через диалог
             if not filename:
+                # Отображение диалога выбора файла
                 filename, _ = QFileDialog.getOpenFileName(
                     self.parent,
                     "Импорт данных из CSV",
                     "",
                     "CSV Files (*.csv)"
                 )
-                if not filename:  # Пользователь отменил диалог
+                # Проверка, не отменил ли пользователь диалог
+                if not filename:
                     return False
             
-            # Читаем данные из CSV файла
+            # Открытие файла для чтения
             with open(filename, 'r', encoding='utf-8') as csvfile:
+                # Создание объекта для чтения CSV
                 csv_reader = csv.reader(csvfile, delimiter=delimiter)
+                # Чтение заголовков
                 headers = next(csv_reader)
 
-                # Получаем заголовки и формируем запрос для вставки
+                # Определение заголовков в зависимости от таблицы
                 if table_name == "products":  # Товары
                     headers = ["product_name", "product_description", "category", "unit_price"]
                 elif table_name == "stock":  # Запасы
@@ -188,16 +221,17 @@ class DataImporter:
                 elif table_name == "warehouses":  # Склады
                     headers = ["warehouse_id", "warehouse_name", "location", "capacity"]
                 
+                # Формирование SQL-запроса для вставки данных
                 placeholders = ', '.join(['%s'] * len(headers))
                 columns = ', '.join(headers)
                 query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
                 
-                # # Импортируем данные построчно
+                # Импорт данных построчно
                 for row in csv_reader:
                     values = row
                     self.db.execute_query(query, values, self.parent)
             
-            # Сообщение об успешном импорте только после успешного завершения всех операций
+            # Показать сообщение об успешном импорте
             QMessageBox.information(
                 self.parent, 
                 "Импорт данных", 
@@ -206,8 +240,10 @@ class DataImporter:
             return True
             
         except Exception as e:
+            # Логирование ошибки импорта
             error_msg = f"Ошибка при импорте данных из CSV: {str(e)}"
             logging.error(error_msg)
+            # Показать сообщение об ошибке
             QMessageBox.critical(self.parent, "Ошибка импорта", error_msg)
             return False
     
@@ -224,22 +260,23 @@ class DataImporter:
             bool: Успешность импорта
         """
         try:
-            # Если имя файла не указано, запрашиваем через диалог
+            # Если имя файла не указано, запрашиваем его через диалог
             if not filename:
+                # Отображение диалога выбора файла
                 filename, _ = QFileDialog.getOpenFileName(
                     self.parent,
                     "Импорт данных из Excel",
                     "",
                     "Excel Files (*.xlsx *.xls)"
                 )
-                if not filename:  # Пользователь отменил диалог
+                # Проверка, не отменил ли пользователь диалог
+                if not filename:
                     return False
             
-            # Читаем данные из Excel файла
+            # Чтение данных из Excel файла
             df = pd.read_excel(filename, sheet_name=sheet_name)
             
-            # Получаем заголовки и формируем запрос для вставки
-            # headers = df.columns.tolist()
+            # Определение заголовков в зависимости от таблицы
             if table_name == "products":  # Товары
                 headers = ["product_name", "product_description", "category", "unit_price"]
             elif table_name == "stock":  # Запасы
@@ -251,16 +288,17 @@ class DataImporter:
             elif table_name == "warehouses":  # Склады
                 headers = ["warehouse_id", "warehouse_name", "location", "capacity"]
 
-
+            # Формирование SQL-запроса для вставки данных
             placeholders = ', '.join(['%s'] * len(headers))
             columns = ', '.join(headers)
             query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
             
-            # Импортируем данные построчно
+            # Импорт данных построчно
             for _, row in df.iterrows():
                 values = row.tolist()
                 self.db.execute_query(query, values, self.parent)
             
+            # Показать сообщение об успешном импорте
             QMessageBox.information(
                 self.parent, 
                 "Импорт данных", 
@@ -269,7 +307,9 @@ class DataImporter:
             return True
             
         except Exception as e:
+            # Логирование ошибки импорта
             error_msg = f"Ошибка при импорте данных из Excel: {str(e)}"
             logging.error(error_msg)
+            # Показать сообщение об ошибке
             QMessageBox.critical(self.parent, "Ошибка импорта", error_msg)
             return False 

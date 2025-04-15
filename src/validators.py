@@ -1,5 +1,8 @@
+# Импорт модуля для работы с регулярными выражениями
 import re
+# Импорт типов для аннотаций
 from typing import Union, Tuple, Any, Dict
+# Импорт модуля для экранирования HTML
 import html
 
 class Validator:
@@ -17,10 +20,13 @@ class Validator:
         Returns:
             Tuple[bool, str]: (Прошла ли проверка, сообщение об ошибке)
         """
+        # Проверка на пустое значение
         if not text:
             return False, "Поле не может быть пустым"
+        # Проверка минимальной длины
         if len(text) < min_length:
             return False, f"Минимальная длина поля - {min_length} символов"
+        # Проверка максимальной длины
         if len(text) > max_length:
             return False, f"Максимальная длина поля - {max_length} символов"
         return True, ""
@@ -35,10 +41,13 @@ class Validator:
         Returns:
             Tuple[bool, str]: (Прошла ли проверка, сообщение об ошибке)
         """
+        # Проверка на пустое значение
         if not email:
             return False, "Email не может быть пустым"
         
+        # Регулярное выражение для проверки формата email
         email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        # Проверка соответствия формату
         if not re.match(email_pattern, email):
             return False, "Неверный формат email"
         return True, ""
@@ -53,12 +62,14 @@ class Validator:
         Returns:
             Tuple[bool, str]: (Прошла ли проверка, сообщение об ошибке)
         """
+        # Проверка на пустое значение
         if not phone:
             return False, "Номер телефона не может быть пустым"
         
-        # Удаляем все нецифровые символы для проверки
+        # Удаление всех нецифровых символов
         digits_only = re.sub(r'\D', '', phone)
         
+        # Проверка длины номера
         if len(digits_only) != 11:
             return False, "Номер телефона должен содержать 11 цифр"
         return True, ""
@@ -78,17 +89,20 @@ class Validator:
             Tuple[bool, str]: (Прошла ли проверка, сообщение об ошибке)
         """
         try:
-            # Конвертируем в число
+            # Преобразование значения в число
             num_value = float(value)
             
+            # Проверка минимального значения
             if min_value is not None and num_value < min_value:
                 return False, f"Значение должно быть не меньше {min_value}"
             
+            # Проверка максимального значения
             if max_value is not None and num_value > max_value:
                 return False, f"Значение должно быть не больше {max_value}"
                 
             return True, ""
         except (ValueError, TypeError):
+            # Обработка ошибок преобразования
             return False, "Введите корректное число"
     
     @staticmethod
@@ -101,6 +115,7 @@ class Validator:
         Returns:
             str: Безопасное значение
         """
+        # Проверка типа входных данных
         if not isinstance(value, str):
             return value
             
@@ -122,12 +137,17 @@ class Validator:
         Returns:
             Dict[str, Any]: Словарь с безопасными значениями
         """
+        # Создание нового словаря для безопасных значений
         result = {}
+        # Обработка каждого элемента словаря
         for key, value in data.items():
+            # Санитизация строковых значений
             if isinstance(value, str):
                 result[key] = Validator.sanitize_input(value)
+            # Рекурсивная санитизация вложенных словарей
             elif isinstance(value, dict):
                 result[key] = Validator.sanitize_dict(value)
+            # Сохранение остальных типов без изменений
             else:
                 result[key] = value
         return result 

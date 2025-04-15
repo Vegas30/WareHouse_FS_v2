@@ -218,19 +218,24 @@ class WarehouseApp(QMainWindow):
     
     def export_to_csv(self):
         """Экспорт данных в CSV файл."""
+        # Получение индекса текущей активной вкладки
         current_tab_index = self.tabs.currentIndex()
+        # Инициализация переменных для SQL-запроса и заголовков
         query = ""
         headers = []
         
-        # Определяем запрос и заголовки на основе текущей вкладки
-        if current_tab_index == 0:  # Товары
+        # Определение SQL-запроса и заголовков в зависимости от текущей вкладки
+        if current_tab_index == 0:  # Вкладка "Товары"
+            # Запрос для получения информации о товарах
             query = """
                 SELECT product_name, product_description, category, unit_price
                 FROM products
                 ORDER BY product_name
             """
+            # Заголовки для CSV файла
             headers = ["Название", "Описание", "Категория", "Цена"]
-        elif current_tab_index == 1:  # Запасы
+        elif current_tab_index == 1:  # Вкладка "Запасы"
+            # Запрос для получения информации о запасах
             query = """
                 SELECT p.product_name, w.warehouse_name, s.quantity, s.last_restocked
                 FROM stock s
@@ -238,53 +243,70 @@ class WarehouseApp(QMainWindow):
                 JOIN warehouses w ON s.warehouse_id = w.warehouse_id
                 ORDER BY p.product_name
             """
+            # Заголовки для CSV файла
             headers = ["Товар", "Склад", "Количество", "Последнее пополнение"]
-        elif current_tab_index == 2:  # Заказы
+        elif current_tab_index == 2:  # Вкладка "Заказы"
+            # Запрос для получения информации о заказах
             query = """
                 SELECT o.order_id, o.order_date, s.supplier_name, o.total_amount, o.status
                 FROM orders o
                 JOIN suppliers s ON o.supplier_id = s.supplier_id
                 ORDER BY o.order_date DESC
             """
+            # Заголовки для CSV файла
             headers = ["ID", "Дата", "Поставщик", "Сумма", "Статус"]
-        elif current_tab_index == 3:  # Поставщики
+        elif current_tab_index == 3:  # Вкладка "Поставщики"
+            # Запрос для получения информации о поставщиках
             query = """
                 SELECT supplier_name, contact_person, phone_number, email
                 FROM suppliers
                 ORDER BY supplier_name
             """
+            # Заголовки для CSV файла
             headers = ["Название", "Контактное лицо", "Телефон", "Email"]
-        elif current_tab_index == 4:  # Склады
+        elif current_tab_index == 4:  # Вкладка "Склады"
+            # Запрос для получения информации о складах
             query = """
                 SELECT warehouse_name, location, capacity
                 FROM warehouses
                 ORDER BY warehouse_name
             """
+            # Заголовки для CSV файла
             headers = ["Название", "Местоположение", "Вместимость"]
         
+        # Если запрос определен, выполняем экспорт
         if query:
+            # Создание объекта для экспорта данных
             exporter = DataExporter(self)
+            # Вызов метода экспорта в CSV
             exporter.export_to_csv(query, headers=headers)
         else:
+            # Показать сообщение об ошибке, если не удалось определить данные для экспорта
             QMessageBox.warning(self, "Экспорт данных", "Не удалось определить данные для экспорта")
     
     def export_to_excel(self):
         """Экспорт данных в Excel файл."""
+        # Получение индекса текущей активной вкладки
         current_tab_index = self.tabs.currentIndex()
+        # Инициализация переменных для SQL-запроса, заголовков и имени листа
         query = ""
         headers = []
         sheet_name = "Данные"
         
-        # Определяем запрос и заголовки на основе текущей вкладки
-        if current_tab_index == 0:  # Товары
+        # Определение SQL-запроса, заголовков и имени листа в зависимости от текущей вкладки
+        if current_tab_index == 0:  # Вкладка "Товары"
+            # Запрос для получения информации о товарах
             query = """
                 SELECT product_name, product_description, category, unit_price
                 FROM products
                 ORDER BY product_name
             """
+            # Заголовки для Excel файла
             headers = ["Название", "Описание", "Категория", "Цена"]
+            # Имя листа в Excel
             sheet_name = "Товары"
-        elif current_tab_index == 1:  # Запасы
+        elif current_tab_index == 1:  # Вкладка "Запасы"
+            # Запрос для получения информации о запасах
             query = """
                 SELECT p.product_name, w.warehouse_name, s.quantity, s.last_restocked
                 FROM stock s
@@ -292,61 +314,85 @@ class WarehouseApp(QMainWindow):
                 JOIN warehouses w ON s.warehouse_id = w.warehouse_id
                 ORDER BY p.product_name
             """
+            # Заголовки для Excel файла
             headers = ["Товар", "Склад", "Количество", "Последнее пополнение"]
+            # Имя листа в Excel
             sheet_name = "Запасы"
-        elif current_tab_index == 2:  # Заказы
+        elif current_tab_index == 2:  # Вкладка "Заказы"
+            # Запрос для получения информации о заказах
             query = """
                 SELECT o.order_id, o.order_date, s.supplier_name, o.total_amount, o.status
                 FROM orders o
                 JOIN suppliers s ON o.supplier_id = s.supplier_id
                 ORDER BY o.order_date DESC
             """
+            # Заголовки для Excel файла
             headers = ["ID", "Дата", "Поставщик", "Сумма", "Статус"]
+            # Имя листа в Excel
             sheet_name = "Заказы"
-        elif current_tab_index == 3:  # Поставщики
+        elif current_tab_index == 3:  # Вкладка "Поставщики"
+            # Запрос для получения информации о поставщиках
             query = """
                 SELECT supplier_name, contact_person, phone_number, email
                 FROM suppliers
                 ORDER BY supplier_name
             """
+            # Заголовки для Excel файла
             headers = ["Название", "Контактное лицо", "Телефон", "Email"]
+            # Имя листа в Excel
             sheet_name = "Поставщики"
-        elif current_tab_index == 4:  # Склады
+        elif current_tab_index == 4:  # Вкладка "Склады"
+            # Запрос для получения информации о складах
             query = """
                 SELECT warehouse_name, location, capacity
                 FROM warehouses
                 ORDER BY warehouse_name
             """
+            # Заголовки для Excel файла
             headers = ["Название", "Местоположение", "Вместимость"]
+            # Имя листа в Excel
             sheet_name = "Склады"
         
+        # Если запрос определен, выполняем экспорт
         if query:
+            # Создание объекта для экспорта данных
             exporter = DataExporter(self)
+            # Вызов метода экспорта в Excel
             exporter.export_to_excel(query, headers=headers, sheet_name=sheet_name)
         else:
+            # Показать сообщение об ошибке, если не удалось определить данные для экспорта
             QMessageBox.warning(self, "Экспорт данных", "Не удалось определить данные для экспорта")
     
     def show_inventory_analysis(self):
         """Показать диалог анализа запасов."""
+        # Создание и отображение диалога анализа запасов
         dialog = InventoryAnalysisDialog(self)
         dialog.exec()
     
     def show_sales_report(self):
         """Показать диалог отчетов по продажам."""
+        # Создание и отображение диалога отчетов по продажам
         dialog = SalesReportDialog(self)
         dialog.exec()
     
     def refresh_current_tab(self):
         """Обновить данные на текущей вкладке."""
+        # Получение индекса текущей активной вкладки
         current_tab_index = self.tabs.currentIndex()
         
-        if current_tab_index == 0:  # Товары
+        # Обновление данных в зависимости от текущей вкладки
+        if current_tab_index == 0:  # Вкладка "Товары"
+            # Загрузка списка товаров
             self.products_tab.load_products()
-        elif current_tab_index == 1:  # Запасы
+        elif current_tab_index == 1:  # Вкладка "Запасы"
+            # Загрузка информации о запасах
             self.stock_tab.load_stock()
-        elif current_tab_index == 2:  # Заказы
+        elif current_tab_index == 2:  # Вкладка "Заказы"
+            # Загрузка списка заказов
             self.orders_tab.load_orders()
-        elif current_tab_index == 3:  # Поставщики
+        elif current_tab_index == 3:  # Вкладка "Поставщики"
+            # Загрузка списка поставщиков
             self.suppliers_tab.load_suppliers()
-        elif current_tab_index == 4:  # Склады
+        elif current_tab_index == 4:  # Вкладка "Склады"
+            # Загрузка списка складов
             self.warehouses_tab.load_warehouses() 
