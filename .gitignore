@@ -1,7 +1,10 @@
-# Python bytecode files
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+
+# C extensions
+*.so
 
 # Distribution / packaging
 dist/
@@ -13,25 +16,27 @@ venv/
 env/
 ENV/
 
-# Local development settings
-.env
-.vscode/
+# IDE specific files
 .idea/
+.vscode/
+*.swp
+*.swo
 
-# Database files
-*.db
-*.sqlite
+# Logs and databases
+*.log
 *.sqlite3
 
-# Logs
-*.log
+# Export files
+src/export_*.csv
+src/export_*.xlsx
 
-# OS generated files
-.DS_Store
+# Local configuration
+.env
+config.ini
+
+# Windows specific
 Thumbs.db
+desktop.ini
 
-# PyQt6 generated files
-*.ui.py
-
-# Compiled resources
-*_rc.py 
+# macOS specific
+.DS_Store 

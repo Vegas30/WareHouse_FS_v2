@@ -527,7 +527,7 @@ class StockTab(QWidget):
     def export_data(self):
         """Экспорт данных о товарах"""
         # Создание диалога экспорта
-        dialog = ExportDialog(self, "Экспорт товаров")
+        dialog = ExportDialog(self, "Экспорт запасов")
         if dialog.exec():
             # Получение данных для экспорта
             export_data = dialog.get_export_data()

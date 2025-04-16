@@ -2,6 +2,12 @@
 import sys
 # Импорт модуля для работы с операционной системой
 import os
+
+# Добавление текущей директории в путь поиска модулей
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
+
 # Импорт необходимых компонентов из PyQt6
 from PyQt6.QtWidgets import QApplication
 # Импорт основного окна приложения
@@ -12,9 +18,10 @@ from login_window import LoginWindow
 import logging
 
 # Настройка логирования
+log_path = os.path.join(os.path.dirname(current_dir), 'app.log')
 logging.basicConfig(
     # Указание файла для записи логов
-    filename='../app.log',
+    filename=log_path,
     # Установка уровня логирования
     level=logging.DEBUG,
     # Формат записи логов

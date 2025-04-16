@@ -13,7 +13,7 @@ class Database:
         try:
             # Установка соединения с базой данных PostgreSQL
             self.conn = psycopg2.connect(
-                dbname="warehouse_fs",  # Имя базы данных
+                dbname="test_db",  # Имя базы данных
                 user="postgres",        # Имя пользователя
                 password="7773",        # Пароль
                 host="localhost",       # Хост
