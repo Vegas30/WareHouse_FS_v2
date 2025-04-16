@@ -58,4 +58,4 @@ python src/build_app.py
 
 ## Лицензия
 
-Copyright © 2023 
+Copyright © 2025 
