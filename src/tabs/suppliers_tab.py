@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
 import logging
-from dialogs import AddSupplierDialog, ConfirmDialog, EmailDialog
+from dialogs import AddSupplierDialog, ConfirmDialog, EmailDialog, ExportDialog
 
 class SuppliersTab(QWidget):
     """
@@ -446,5 +446,88 @@ class SuppliersTab(QWidget):
 
     def export_data(self):
         """Экспорт данных о поставщиках"""
-        # Простая реализация - в реальном приложении использовалась бы функциональность экспорта
-        QMessageBox.information(self, "Экспорт", "Функция экспорта пока не реализована") 
+        # Создание диалога экспорта
+        dialog = ExportDialog(self, "Экспорт поставщиков")
+        if dialog.exec():
+            # Получение данных для экспорта
+            export_data = dialog.get_export_data()
+            file_path = export_data["file_path"]
+            export_format = export_data["format"]
+            
+            if not file_path:
+                # Отображение предупреждения, если путь не выбран
+                QMessageBox.warning(self, "Внимание", "Выберите путь для сохранения файла")
+                return
+
+            try:
+                # Получение текста поиска
+                search_text = self.search.text()
+                
+                # Базовый SQL-запрос
+                query = """
+                    SELECT supplier_name, contact_person, phone_number, email
+                    FROM suppliers
+                    WHERE 1=1
+                """
+                
+                params = []
+                
+                # Добавление фильтра поиска
+                if search_text:
+                    search_param = f"%{search_text}%"
+                    query += """ AND (
+                        supplier_name ILIKE %s
+                        OR contact_person ILIKE %s
+                        OR phone_number LIKE %s
+                        OR email ILIKE %s
+                    )"""
+                    params.extend([search_param, search_param, search_param, search_param])
+                
+                # Добавление сортировки
+                query += " ORDER BY supplier_name"
+
+                # Заголовки для экспорта
+                headers = ["Наименование", "Контактное лицо", "Телефон", "Email"]
+                
+                # Создание объекта для экспорта
+                from data_export import DataExporter
+                exporter = DataExporter(self)
+                
+                # Экспорт в зависимости от выбранного формата
+                if "Excel" in export_format:
+                    success = exporter.export_to_excel(
+                        query=query,
+                        params=params,
+                        filename=file_path,
+                        headers=headers,
+                        sheet_name="Поставщики"
+                    )
+                elif "CSV" in export_format:
+                    success = exporter.export_to_csv(
+                        query=query,
+                        params=params,
+                        filename=file_path,
+                        headers=headers
+                    )
+                elif "PDF" in export_format:
+                    success = exporter.export_to_pdf(
+                        query=query,
+                        params=params,
+                        filename=file_path,
+                        headers=headers,
+                        title="Отчет по поставщикам"
+                    )
+                else:
+                    # Отображение предупреждения о неподдерживаемом формате
+                    QMessageBox.warning(self, "Экспорт", "Формат не поддерживается")
+                    return
+                
+                if not success:
+                    # Отображение сообщения об ошибке
+                    QMessageBox.critical(self, "Ошибка", "Не удалось экспортировать данные")
+                    
+            except Exception as e:
+                # Логирование ошибки
+                logging.error(f"Ошибка экспорта поставщиков: {str(e)}")
+                # Отображение сообщения об ошибке
+                QMessageBox.critical(self, "Ошибка", f"Ошибка при экспорте данных: {str(e)}") 

@@ -6,7 +6,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
 import logging
-from dialogs import AddWarehouseDialog, ConfirmDialog
+from dialogs import AddWarehouseDialog, ConfirmDialog, ExportDialog
+from data_export import DataExporter
 
 class WarehousesTab(QWidget):
     """
@@ -425,5 +426,82 @@ class WarehousesTab(QWidget):
 
     def export_data(self):
         """Экспорт данных о складах"""
-        # Простая реализация - в реальном приложении использовалась бы функциональность экспорта
-        QMessageBox.information(self, "Экспорт", "Функция экспорта пока не реализована") 
+        # Создание диалога экспорта
+        dialog = ExportDialog(self, "Экспорт складов")
+        if dialog.exec():
+            # Получение данных для экспорта
+            export_data = dialog.get_export_data()
+            file_path = export_data["file_path"]
+            export_format = export_data["format"]
+            
+            if not file_path:
+                # Отображение предупреждения, если путь не выбран
+                QMessageBox.warning(self, "Внимание", "Выберите путь для сохранения файла")
+                return
+
+            try:
+                # Получение текста поиска
+                search_text = self.search.text()
+                
+                # Базовый SQL-запрос
+                query = """
+                    SELECT warehouse_name, location, capacity
+                    FROM warehouses
+                    WHERE 1=1
+                """
+                
+                params = []
+                
+                # Добавление фильтра поиска
+                if search_text:
+                    search_param = f"%{search_text}%"
+                    query += " AND (warehouse_name ILIKE %s OR location ILIKE %s)"
+                    params.extend([search_param, search_param])
+                
+                # Добавление сортировки
+                query += " ORDER BY warehouse_name"
+
+                # Заголовки для экспорта
+                headers = ["Название", "Местоположение", "Вместимость"]
+                
+                # Создание объекта для экспорта
+                exporter = DataExporter(self)
+                
+                # Экспорт в зависимости от выбранного формата
+                if "Excel" in export_format:
+                    success = exporter.export_to_excel(
+                        query=query,
+                        params=params,
+                        filename=file_path,
+                        headers=headers,
+                        sheet_name="Склады"
+                    )
+                elif "CSV" in export_format:
+                    success = exporter.export_to_csv(
+                        query=query,
+                        params=params,
+                        filename=file_path,
+                        headers=headers
+                    )
+                elif "PDF" in export_format:
+                    success = exporter.export_to_pdf(
+                        query=query,
+                        params=params,
+                        filename=file_path,
+                        headers=headers,
+                        title="Отчет по складам"
+                    )
+                else:
+                    # Отображение предупреждения о неподдерживаемом формате
+                    QMessageBox.warning(self, "Экспорт", "Формат не поддерживается")
+                    return
+                
+                if not success:
+                    # Отображение сообщения об ошибке
+                    QMessageBox.critical(self, "Ошибка", "Не удалось экспортировать данные")
+                    
+            except Exception as e:
+                # Логирование ошибки
+                logging.error(f"Ошибка экспорта складов: {str(e)}")
+                # Отображение сообщения об ошибке
+                QMessageBox.critical(self, "Ошибка", f"Ошибка при экспорте данных: {str(e)}") 

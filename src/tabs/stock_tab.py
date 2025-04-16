@@ -8,6 +8,7 @@ from PyQt6.QtCore import Qt, QDate
 from PyQt6.QtGui import QIcon
 import logging
 from data_export import DataExporter
+from dialogs import ExportDialog
 from validators import Validator
 from visualization import InventoryAnalysisDialog
 
@@ -121,17 +122,22 @@ class StockTab(QWidget):
         self.low_stock_label.setStyleSheet("color: #d32f2f; font-weight: bold;")
         
         # Создание кнопок экспорта
-        self.btn_export_csv = QPushButton("Экспорт в CSV")
-        self.btn_export_csv.setIcon(QIcon.fromTheme("document-save"))
+        self.btn_export = QPushButton("Экспорт")
+        self.btn_export.setIcon(QIcon.fromTheme("document-save"))
+
+        # self.btn_export_csv = QPushButton("Экспорт в CSV")
+        # self.btn_export_csv.setIcon(QIcon.fromTheme("document-save"))
         
-        self.btn_export_excel = QPushButton("Экспорт в Excel")
-        self.btn_export_excel.setIcon(QIcon.fromTheme("x-office-spreadsheet"))
+        # self.btn_export_excel = QPushButton("Экспорт в Excel")
+        # self.btn_export_excel.setIcon(QIcon.fromTheme("x-office-spreadsheet"))
 
         # Добавление элементов на правую панель
         right_button_panel.addWidget(self.low_stock_label)
         right_button_panel.addStretch()
-        right_button_panel.addWidget(self.btn_export_csv)
-        right_button_panel.addWidget(self.btn_export_excel)
+        right_button_panel.addStretch()
+        right_button_panel.addWidget(self.btn_export)
+        # right_button_panel.addWidget(self.btn_export_csv)
+        # right_button_panel.addWidget(self.btn_export_excel)
 
         # Сборка нижней панели из левой и правой частей
         bottom_panel.addLayout(left_button_panel, stretch=1)
@@ -151,8 +157,9 @@ class StockTab(QWidget):
         self.btn_move.clicked.connect(self.move_stock)
         self.btn_refresh.clicked.connect(self.load_stock)
         self.btn_report.clicked.connect(self.generate_report)
-        self.btn_export_csv.clicked.connect(self.export_to_csv)
-        self.btn_export_excel.clicked.connect(self.export_to_excel)
+        self.btn_export.clicked.connect(self.export_data)
+        # self.btn_export_csv.clicked.connect(self.export_to_csv)
+        # self.btn_export_excel.clicked.connect(self.export_to_excel)
         self.btn_analysis.clicked.connect(self.show_analysis)
         self.search.textChanged.connect(self.handle_search)
         self.warehouse_filter.currentIndexChanged.connect(self.load_stock)
@@ -516,6 +523,105 @@ class StockTab(QWidget):
             logging.error(f"Ошибка генерации отчета: {str(e)}")
             # Отображение сообщения об ошибке
             QMessageBox.critical(self, "Ошибка", "Не удалось сформировать отчет")
+
+    def export_data(self):
+        """Экспорт данных о товарах"""
+        # Создание диалога экспорта
+        dialog = ExportDialog(self, "Экспорт товаров")
+        if dialog.exec():
+            # Получение данных для экспорта
+            export_data = dialog.get_export_data()
+            file_path = export_data["file_path"]
+            export_format = export_data["format"]
+            
+            if not file_path:
+                # Отображение предупреждения, если путь не выбран
+                QMessageBox.warning(self, "Внимание", "Выберите путь для сохранения файла")
+                return
+
+            try:
+                # Получение выбранных фильтров
+                selected_warehouse = self.warehouse_filter.currentData()
+                selected_category = self.category_filter.currentData()
+                search_text = self.search.text()
+
+                # SQL-запрос для получения данных о товарах
+                query = """
+                    SELECT p.product_name, w.warehouse_name, s.quantity, 
+                        s.last_restocked, p.category, p.unit_price
+                    FROM stock s
+                    JOIN products p ON s.product_id = p.product_id
+                    JOIN warehouses w ON s.warehouse_id = w.warehouse_id
+                    WHERE 1=1
+                """
+
+                params = []
+
+                # Добавление фильтра по складу
+                if selected_warehouse:
+                    query += " AND s.warehouse_id = %s"
+                    params.append(selected_warehouse)
+                
+                # Добавление фильтра по категории
+                if selected_category:
+                    query += " AND p.category = %s"
+                    params.append(selected_category)
+                
+                # Добавление фильтра поиска
+                if search_text:
+                    # Очистка ввода для поиска
+                    search_text = Validator.sanitize_input(search_text)
+                    query += " AND (p.product_name ILIKE %s OR p.category ILIKE %s)"
+                    params.extend([f"%{search_text}%", f"%{search_text}%"])
+                
+                # Добавление сортировки
+                query += " ORDER BY p.product_name"
+                
+                # Заголовки для экспорта
+                headers = ["Товар", "Склад", "Количество", "Последнее пополнение", "Категория", "Цена за ед."]
+                
+                # Создание объекта для экспорта
+                exporter = DataExporter(self)
+                
+                # Экспорт в зависимости от выбранного формата
+                if "Excel" in export_format:
+                    success = exporter.export_to_excel(
+                        query=query,
+                        params=params,
+                        filename=file_path,
+                        headers=headers,
+                        sheet_name="Товары"
+                    )
+                elif "CSV" in export_format:
+                    success = exporter.export_to_csv(
+                        query=query,
+                        params=params,
+                        filename=file_path,
+                        headers=headers
+                    )
+                elif "PDF" in export_format:
+                    success = exporter.export_to_pdf(
+                        query=query,
+                        params=params,
+                        filename=file_path,
+                        headers=headers,
+                        title="Отчет по товарам"
+                    )
+                else:
+                    # Отображение предупреждения о неподдерживаемом формате
+                    QMessageBox.warning(self, "Экспорт", "Формат не поддерживается")
+                    return
+                
+                if not success:
+                    # Отображение сообщения об ошибке
+                    QMessageBox.critical(self, "Ошибка", "Не удалось экспортировать данные")
+                    
+            except Exception as e:
+                # Логирование ошибки
+                logging.error(f"Ошибка экспорта товаров: {str(e)}")
+                # Отображение сообщения об ошибке
+                QMessageBox.critical(self, "Ошибка", f"Ошибка при экспорте данных: {str(e)}")
+
 
     def export_to_csv(self):
         """Экспорт данных о запасах в CSV файл"""

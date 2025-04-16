@@ -8,6 +8,7 @@ from PyQt6.QtGui import QIcon
 import logging
 from dialogs import AddProductDialog, ConfirmDialog, ExportDialog
 from data_export import DataExporter
+from validators import Validator
 
 class ProductsTab(QWidget):
     """
@@ -336,13 +337,28 @@ class ProductsTab(QWidget):
                 return
 
             try:
+                # Получение выбранных фильтров
+                search_text = self.search.text()
+
                 # SQL-запрос для получения данных о товарах
                 query = """
                     SELECT p.product_name, p.product_description, p.category, p.unit_price
                     FROM products p
-                    ORDER BY p.product_name
+                    WHERE 1=1
                 """
                 
+                params = []
+
+                # Добавление фильтра поиска
+                if search_text:
+                    # Очистка ввода для поиска
+                    search_text = Validator.sanitize_input(search_text)
+                    query += " AND (p.product_name ILIKE %s OR p.category ILIKE %s OR p.product_description ILIKE %s)"
+                    params.extend([f"%{search_text}%", f"%{search_text}%", f"%{search_text}%"])
+                
+                # Добавление сортировки
+                query += " ORDER BY p.product_name"
+
                 # Заголовки для экспорта
                 headers = ["Название", "Описание", "Категория", "Цена"]
                 
@@ -353,6 +369,7 @@ class ProductsTab(QWidget):
                 if "Excel" in export_format:
                     success = exporter.export_to_excel(
                         query=query,
+                        params=params,
                         filename=file_path,
                         headers=headers,
                         sheet_name="Товары"
@@ -360,12 +377,14 @@ class ProductsTab(QWidget):
                 elif "CSV" in export_format:
                     success = exporter.export_to_csv(
                         query=query,
+                        params=params,
                         filename=file_path,
                         headers=headers
                     )
                 elif "PDF" in export_format:
                     success = exporter.export_to_pdf(
                         query=query,
+                        params=params,
                         filename=file_path,
                         headers=headers,
                         title="Отчет по товарам"

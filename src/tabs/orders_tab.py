@@ -486,12 +486,87 @@ class OrdersTab(QWidget):
             # Получение данных для экспорта
             export_data = dialog.get_export_data()
             file_path = export_data["file_path"]
+            export_format = export_data["format"]
             
             if not file_path:
                 # Отображение предупреждения, если путь не выбран
                 QMessageBox.warning(self, "Внимание", "Выберите путь для сохранения файла")
                 return
-            
-            # Здесь будет реализация экспорта
-            # Это просто заглушка
-            QMessageBox.information(self, "Экспорт", f"Данные успешно экспортированы в {file_path}") 
+
+            try:
+                # Получение текста поиска и выбранного статуса
+                search_text = self.search.text()
+                status_filter = self.status_filter.currentData()
+                
+                # Базовый SQL-запрос
+                query = """
+                    SELECT o.order_date, s.supplier_name, o.total_amount, 
+                           o.status, o.updated_at
+                    FROM orders o
+                    JOIN suppliers s ON o.supplier_id = s.supplier_id
+                    WHERE 1=1
+                """
+                params = []
+                
+                # Добавление фильтра по статусу
+                if status_filter:
+                    query += " AND o.status = %s"
+                    params.append(status_filter)
+                
+                # Добавление фильтра поиска
+                if search_text:
+                    query += """ AND (
+                        o.order_id::text LIKE %s
+                        OR s.supplier_name ILIKE %s
+                    )"""
+                    search_param = f"%{search_text}%"
+                    params.extend([search_param, search_param])
+                
+                # Добавление сортировки
+                query += " ORDER BY o.order_date DESC"
+
+                # Заголовки для экспорта
+                headers = ["Дата", "Поставщик", "Сумма", "Статус", "Обновлено"]
+                
+                # Создание объекта для экспорта
+                from data_export import DataExporter
+                exporter = DataExporter(self)
+                
+                # Экспорт в зависимости от выбранного формата
+                if "Excel" in export_format:
+                    success = exporter.export_to_excel(
+                        query=query,
+                        params=params,
+                        filename=file_path,
+                        headers=headers,
+                        sheet_name="Заказы"
+                    )
+                elif "CSV" in export_format:
+                    success = exporter.export_to_csv(
+                        query=query,
+                        params=params,
+                        filename=file_path,
+                        headers=headers
+                    )
+                elif "PDF" in export_format:
+                    success = exporter.export_to_pdf(
+                        query=query,
+                        params=params,
+                        filename=file_path,
+                        headers=headers,
+                        title="Отчет по заказам"
+                    )
+                else:
+                    # Отображение предупреждения о неподдерживаемом формате
+                    QMessageBox.warning(self, "Экспорт", "Формат не поддерживается")
+                    return
+                
+                if not success:
+                    # Отображение сообщения об ошибке
+                    QMessageBox.critical(self, "Ошибка", "Не удалось экспортировать данные")
+                    
+            except Exception as e:
+                # Логирование ошибки
+                logging.error(f"Ошибка экспорта заказов: {str(e)}")
+                # Отображение сообщения об ошибке
+                QMessageBox.critical(self, "Ошибка", f"Ошибка при экспорте данных: {str(e)}") 
