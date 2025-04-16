@@ -11,6 +11,8 @@ from PyQt6.QtGui import QFont
 import logging
 # Импорт модуля базы данных
 from database import Database
+# Импорт модуля для работы с датами
+import datetime
 
 # Класс диалогового окна для работы с товарами
 class ProductDialog(QDialog):
@@ -1074,11 +1076,19 @@ class ExportDialog(QDialog):
         # Получение текущего выбранного формата
         current_format = self.format_combo.currentIndex()
         
+        # Получаем название вкладки из заголовка диалога
+        tab_name = self.windowTitle().replace("Экспорт ", "Экспорт_").replace("данных", "").strip().lower()
+        if not tab_name:
+            tab_name = "export"
+        
+        # Формирование имени файла по умолчанию, используя название вкладки вместо "export"
+        default_name = f"{tab_name}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
         # Открытие диалога выбора файла
         file_path, _ = QFileDialog.getSaveFileName(
             self, 
             "Сохранить файл",
-            "",
+            default_name,
             formats[current_format]
         )
         

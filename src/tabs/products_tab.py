@@ -82,7 +82,7 @@ class ProductsTab(QWidget):
 
         # Добавление кнопок на левую панель
         left_button_panel.addWidget(self.btn_refresh)
-        left_button_panel.addWidget(self.btn_stats)
+        # left_button_panel.addWidget(self.btn_stats)
         left_button_panel.addStretch()
 
         # Создание правой части нижней панели - кнопка экспорта
@@ -362,6 +362,13 @@ class ProductsTab(QWidget):
                         query=query,
                         filename=file_path,
                         headers=headers
+                    )
+                elif "PDF" in export_format:
+                    success = exporter.export_to_pdf(
+                        query=query,
+                        filename=file_path,
+                        headers=headers,
+                        title="Отчет по товарам"
                     )
                 else:
                     # Отображение предупреждения о неподдерживаемом формате
