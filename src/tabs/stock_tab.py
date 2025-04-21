@@ -384,8 +384,10 @@ class StockTab(QWidget):
             dialog = MoveStockDialog(self, self.db, product_name, source_warehouse, current_quantity)
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 # Получение данных для перемещения
-                target_warehouse_id, quantity_to_move = dialog.get_move_data()
-                
+                move_data = dialog.get_move_data()
+                target_warehouse_id = move_data["target_warehouse_id"]
+                quantity_to_move = move_data["quantity"]
+
                 # Проверка возможности перемещения
                 if quantity_to_move > current_quantity:
                     QMessageBox.warning(self, "Предупреждение", "Нельзя переместить больше товара, чем имеется на складе")
@@ -1030,6 +1032,6 @@ class MoveStockDialog(QDialog):
         """Получение данных для перемещения"""
         return {
             "target_warehouse_id": self.target_combo.currentData(),
-            "target_warehouse_name": self.target_combo.currentText(),
+            # "target_warehouse_name": self.target_combo.currentText(),
             "quantity": self.quantity_spin.value()
         } 
