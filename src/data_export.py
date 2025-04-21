@@ -367,6 +367,154 @@ class DataExporter:
             QMessageBox.critical(self.parent, "Ошибка экспорта", error_msg)
             return False
 
+    def export_order_details_to_pdf(self, order_id, order_details, order_items, filename=None):
+        """
+        Экспорт деталей заказа в PDF файл
+        
+        Args:
+            order_id: Идентификатор заказа
+            order_details: Детали заказа (кортеж с информацией о заказе)
+            order_items: Позиции заказа (список кортежей с позициями заказа)
+            filename: Имя файла для экспорта (если None, будет показан диалог)
+            
+        Returns:
+            bool: Успешность экспорта
+        """
+        try:
+            # Если имя файла не указано, запрашиваем его через диалог
+            if not filename:
+                # Формирование имени файла по умолчанию с текущей датой и временем
+                default_name = f"Заказ_{order_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+                # Отображение диалога сохранения файла
+                filename, _ = QFileDialog.getSaveFileName(
+                    self.parent,
+                    "Сохранить детали заказа как PDF",
+                    default_name,
+                    "PDF Files (*.pdf)"
+                )
+                # Проверка, не отменил ли пользователь диалог
+                if not filename:
+                    return False
+            
+            # Регистрация шрифта с поддержкой кириллицы (используем существующую логику из класса)
+            font_name = 'Helvetica'  # Шрифт по умолчанию (без кириллицы)
+            try:
+                font_paths = [
+                    os.path.join('src', 'fonts', 'DejaVuSans.ttf'),  # Ищем в папке src/fonts
+                    'DejaVuSans.ttf',                               # Ищем в корне проекта
+                    os.path.join(os.path.dirname(__file__), 'fonts', 'DejaVuSans.ttf'),  # Ищем относительно текущего файла
+                ]
+                
+                font_registered = False
+                
+                for font_path in font_paths:
+                    if os.path.exists(font_path):
+                        pdfmetrics.registerFont(TTFont('DejaVuSans', font_path))
+                        font_name = 'DejaVuSans'
+                        font_registered = True
+                        break
+                
+                if not font_registered:
+                    try:
+                        pdfmetrics.registerFont(TTFont('Arial', 'arial.ttf'))
+                        font_name = 'Arial'
+                    except:
+                        QMessageBox.warning(self.parent, "Предупреждение",
+                                           "Не найден шрифт с поддержкой кириллицы. Возможны проблемы с отображением русских символов.")
+            except Exception as e:
+                logging.error(f"Ошибка при регистрации шрифта: {str(e)}")
+                QMessageBox.warning(self.parent, "Предупреждение",
+                                   "Не удалось зарегистрировать шрифт с поддержкой кириллицы. Возможны проблемы с отображением русских символов.")
+            
+            # Создаем PDF документ с отступами
+            doc = SimpleDocTemplate(
+                filename, 
+                pagesize=A4, 
+                leftMargin=2*cm,
+                rightMargin=2*cm,
+                topMargin=2*cm,
+                bottomMargin=2*cm
+            )
+            
+            # Создаем элементы документа
+            elements = []
+            styles = getSampleStyleSheet()
+            
+            # Настраиваем стили с указанием шрифта с поддержкой кириллицы
+            title_style = styles['Heading1']
+            title_style.fontName = font_name
+            normal_style = styles['Normal']
+            normal_style.fontName = font_name
+            heading2_style = styles['Heading2']
+            heading2_style.fontName = font_name
+            
+            # Добавляем заголовок
+            elements.append(Paragraph(f"Заказ №{order_id}", title_style))
+            elements.append(Spacer(1, 0.5*cm))
+            
+            # Информация о заказе
+            elements.append(Paragraph(f"<b>Дата заказа:</b> {order_details[1]}", normal_style))
+            elements.append(Paragraph(f"<b>Поставщик:</b> {order_details[2]}", normal_style))
+            elements.append(Paragraph(f"<b>Статус:</b> {order_details[4]}", normal_style))
+            elements.append(Paragraph(f"<b>Общая сумма:</b> {order_details[3]}", normal_style))
+            elements.append(Spacer(1, 0.3*cm))
+            elements.append(Paragraph(f"<i>Создан: {order_details[5]} | Обновлен: {order_details[6]}</i>", normal_style))
+            elements.append(Spacer(1, 0.5*cm))
+            
+            # Заголовок таблицы
+            elements.append(Paragraph("Позиции заказа:", heading2_style))
+            elements.append(Spacer(1, 0.3*cm))
+            
+            # Определяем заголовки для таблицы позиций
+            headers = ["ID", "Товар", "Количество", "Цена за ед.", "Итого"]
+            
+            # Создаем таблицу с позициями заказа
+            table_data = [headers]
+            for item in order_items:
+                table_data.append([str(x) for x in item])
+            
+            # Настраиваем ширину столбцов
+            col_widths = [1*cm, 8*cm, 2*cm, 3*cm, 3*cm]
+            table = Table(table_data, colWidths=col_widths, repeatRows=1)
+            
+            # Определяем стиль таблицы
+            table_style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, -1), font_name),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('ALIGN', (2, 1), (4, -1), 'RIGHT'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ])
+            
+            # Применяем стиль к таблице
+            table.setStyle(table_style)
+            elements.append(table)
+            
+            # Генерируем PDF файл
+            doc.build(elements)
+            
+            # Показать сообщение об успешном экспорте
+            QMessageBox.information(
+                self.parent, 
+                "Экспорт данных", 
+                f"Детали заказа №{order_id} экспортированы в PDF успешно"
+            )
+            
+            return True
+            
+        except Exception as e:
+            # Логирование ошибки экспорта
+            error_msg = f"Ошибка при экспорте деталей заказа в PDF: {str(e)}"
+            logging.error(error_msg)
+            # Показать сообщение об ошибке
+            QMessageBox.critical(self.parent, "Ошибка экспорта", error_msg)
+            return False
+
 
 class DataImporter:
     """Класс для импорта данных в приложение из различных форматов"""

@@ -2,7 +2,7 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QMessageBox, QComboBox, QDateEdit, QSpinBox,
                              QDoubleSpinBox, QGridLayout, QFormLayout, QTextEdit, QDialogButtonBox,
-                             QFileDialog)
+                             QFileDialog, QTableWidget, QAbstractItemView, QTableWidgetItem)
 # Импорт базовых классов и типов данных из PyQt6
 from PyQt6.QtCore import Qt, QDate
 # Импорт шрифтов из PyQt6
@@ -13,6 +13,23 @@ import logging
 from database import Database
 # Импорт модуля для работы с датами
 import datetime
+
+# Base Dialog Class (optional, for common features like button boxes)
+class BaseDialog(QDialog):
+    def __init__(self, title="", parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.layout = QVBoxLayout(self)
+        self.form_layout = QFormLayout()
+        self.layout.addLayout(self.form_layout)
+
+        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        self.layout.addWidget(self.button_box)
+
+    def add_row(self, label, widget):
+        self.form_layout.addRow(label, widget)
 
 # Класс диалогового окна для работы с товарами
 class ProductDialog(QDialog):
@@ -730,133 +747,222 @@ class AddSupplierDialog(QDialog):
         }
 
 # Класс диалогового окна для добавления заказа
-class AddOrderDialog(QDialog):
-    # Инициализация класса
+class AddOrderDialog(BaseDialog):
+    """Диалог для создания и редактирования заказов поставщиков."""
     def __init__(self, parent=None, db=None):
-        # Вызов конструктора родительского класса
-        super().__init__(parent)
-        # Сохранение объекта базы данных
+        super().__init__("Создать заказ", parent)
         self.db = db
-        # Установка заголовка окна
-        self.setWindowTitle("Создать заказ")
-        # Установка минимальной ширины окна
-        self.setMinimumWidth(450)
-        # Инициализация списка поставщиков
-        self.suppliers = []
-        # Загрузка списка поставщиков из базы данных
+        self.setMinimumSize(600, 500)
+
+        # --- Top Section: Supplier and Product Selection ---
+        selection_layout = QFormLayout()
+
+        self.supplier_combo = QComboBox()
+        self.product_combo = QComboBox()
+        self.quantity_spin = QSpinBox()
+        self.quantity_spin.setMinimum(1)
+        self.quantity_spin.setMaximum(9999)
+        self.price_spin = QDoubleSpinBox() # Price might be fetched or entered
+        self.price_spin.setDecimals(2)
+        self.price_spin.setMinimum(0.01)
+        self.price_spin.setMaximum(99999.99)
+        self.btn_add_item = QPushButton("Добавить товар в заказ")
+
+        selection_layout.addRow("Поставщик:", self.supplier_combo)
+        selection_layout.addRow("Товар:", self.product_combo)
+        selection_layout.addRow("Цена за ед.:", self.price_spin) # Allow manual entry/override
+        selection_layout.addRow("Количество:", self.quantity_spin)
+        selection_layout.addRow("", self.btn_add_item)
+
+        self.layout.insertLayout(0, selection_layout) # Insert before button box
+
+        # --- Middle Section: Order Items Table ---
+        self.order_items_table = QTableWidget()
+        self.order_items_table.setColumnCount(5) # Product ID, Name, Qty, Unit Price, Total
+        self.order_items_table.setHorizontalHeaderLabels(["ID Товара", "Название", "Кол-во", "Цена", "Итого"])
+        self.order_items_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.order_items_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        # self.order_items_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.order_items_table.verticalHeader().setVisible(False)
+        self.layout.insertWidget(1, self.order_items_table)
+
+        # Добавляем кнопку удаления товара
+        remove_button_layout = QHBoxLayout()
+        self.btn_remove_item = QPushButton("Удалить выбранный товар")
+        self.btn_remove_item.setStyleSheet("background-color: #d32f2f; color: white;")
+        remove_button_layout.addStretch()
+        remove_button_layout.addWidget(self.btn_remove_item)
+        self.layout.insertLayout(2, remove_button_layout)
+
+        # --- Bottom Section: Total Amount and Buttons ---
+        total_layout = QHBoxLayout()
+        self.total_label = QLabel("Общая сумма заказа: 0.00")
+        total_layout.addStretch()
+        total_layout.addWidget(self.total_label)
+        self.layout.insertLayout(3, total_layout)
+        
+        # --- Load Data & Connect Signals ---
         self.load_suppliers()
-        # Настройка пользовательского интерфейса
-        self.setup_ui()
-        
-    # Метод загрузки списка поставщиков из базы данных
+        self.load_products()
+        self.btn_add_item.clicked.connect(self.add_item_to_order)
+        self.btn_remove_item.clicked.connect(self.remove_item_from_order)
+        self.product_combo.currentIndexChanged.connect(self.update_price_from_product) # Auto-fill price
+
     def load_suppliers(self):
-        # Проверка наличия объекта базы данных
-        if self.db:
+        try:
+            self.supplier_combo.clear()
+            self.db.cursor.execute("SELECT supplier_id, supplier_name FROM suppliers ORDER BY supplier_name")
+            suppliers = self.db.cursor.fetchall()
+            if not suppliers:
+                self.supplier_combo.addItem("Нет доступных поставщиков", -1)
+                self.supplier_combo.setEnabled(False)
+            else:
+                self.supplier_combo.addItem("Выберите поставщика...", -1)
+                for supplier_id, name in suppliers:
+                    self.supplier_combo.addItem(name, supplier_id)
+        except Exception as e:
+            logging.error(f"Ошибка загрузки поставщиков для диалога: {e}")
+            QMessageBox.critical(self, "Ошибка БД", "Не удалось загрузить список поставщиков.")
+
+    def load_products(self):
+        try:
+            self.product_combo.clear()
+            # Store price along with ID and name
+            self.db.cursor.execute("SELECT product_id, product_name, unit_price FROM products ORDER BY product_name")
+            products = self.db.cursor.fetchall()
+            if not products:
+                self.product_combo.addItem("Нет доступных товаров", -1)
+                self.product_combo.setEnabled(False)
+            else:
+                self.product_combo.addItem("Выберите товар...", (-1, 0.0))
+                for product_id, name, price in products:
+                    self.product_combo.addItem(name, (product_id, float(price)))
+        except Exception as e:
+            logging.error(f"Ошибка загрузки товаров для диалога: {e}")
+            QMessageBox.critical(self, "Ошибка БД", "Не удалось загрузить список товаров.")
+
+    def update_price_from_product(self, index):
+        if index > 0:  # Ignore placeholder
+            data = self.product_combo.itemData(index)
+            if isinstance(data, tuple) and len(data) == 2:
+                product_id, unit_price = data
+                if product_id != -1:
+                    self.price_spin.setValue(unit_price)
+
+    def add_item_to_order(self):
+        product_index = self.product_combo.currentIndex()
+        if product_index <= 0:  # Placeholder selected
+            QMessageBox.warning(self, "Ошибка", "Пожалуйста, выберите товар.")
+            return
+
+        data = self.product_combo.itemData(product_index)
+        if isinstance(data, tuple) and len(data) == 2:
+            product_id, _ = data  # игнорируем price из tuple, используем введенный price
+        else:
+            # Если данные в другом формате
+            product_id = data
+            
+        product_name = self.product_combo.currentText()
+        quantity = self.quantity_spin.value()
+        entered_price = self.price_spin.value()  # Use entered/updated price
+
+        if quantity <= 0 or entered_price <= 0:
+            QMessageBox.warning(self, "Ошибка", "Количество и цена должны быть больше нуля.")
+            return
+
+        # Check if product already in table
+        for row in range(self.order_items_table.rowCount()):
+            if self.order_items_table.item(row, 0).text() == str(product_id):
+                QMessageBox.warning(self, "Дубликат", f"Товар '{product_name}' уже добавлен в заказ.")
+                return
+
+        # Add row to table
+        row_count = self.order_items_table.rowCount()
+        self.order_items_table.insertRow(row_count)
+
+        total_item_price = quantity * entered_price
+
+        self.order_items_table.setItem(row_count, 0, QTableWidgetItem(str(product_id)))
+        self.order_items_table.setItem(row_count, 1, QTableWidgetItem(product_name))
+        self.order_items_table.setItem(row_count, 2, QTableWidgetItem(str(quantity)))
+        self.order_items_table.setItem(row_count, 3, QTableWidgetItem(f"{entered_price:.2f}"))
+        self.order_items_table.setItem(row_count, 4, QTableWidgetItem(f"{total_item_price:.2f}"))
+
+        self.update_total_amount()
+        # Reset selection fields
+        self.product_combo.setCurrentIndex(0)
+        self.quantity_spin.setValue(1)
+        self.price_spin.setValue(0.01)
+
+    def remove_item_from_order(self):
+        """Удаление выбранного товара из таблицы заказа"""
+        selected_rows = self.order_items_table.selectedIndexes()
+        if not selected_rows:
+            QMessageBox.warning(self, "Внимание", "Выберите товар для удаления из заказа")
+            return
+            
+        # Получение номера строки
+        row = selected_rows[0].row()
+        product_name = self.order_items_table.item(row, 1).text()
+        
+        # Подтверждение удаления
+        if QMessageBox.question(
+            self, 
+            "Подтверждение удаления", 
+            f"Вы действительно хотите удалить товар '{product_name}' из заказа?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        ) == QMessageBox.StandardButton.Yes:
+            # Удаление строки
+            self.order_items_table.removeRow(row)
+            # Обновление общей суммы
+            self.update_total_amount()
+
+    def update_total_amount(self):
+        total = 0.0
+        for row in range(self.order_items_table.rowCount()):
             try:
-                # SQL-запрос для получения списка поставщиков
-                query = "SELECT supplier_id, supplier_name FROM suppliers ORDER BY supplier_name"
-                # Получение списка поставщиков из базы данных
-                self.suppliers = self.db.fetch_all(query)
-            except Exception as e:
-                # Логирование ошибки при загрузке поставщиков
-                logging.error(f"Error loading suppliers: {str(e)}")
-                # Инициализация пустого списка в случае ошибки
-                self.suppliers = []
-    
-    # Метод настройки пользовательского интерфейса
-    def setup_ui(self):
-        # Создание вертикального макета
-        layout = QVBoxLayout()
-        
-        # Создание заголовка
-        title = QLabel("Новый заказ")
-        # Выравнивание заголовка по центру
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # Установка шрифта для заголовка
-        title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
-        # Установка стиля для заголовка
-        title.setStyleSheet("color: #2e7d32; margin-bottom: 15px;")
-        # Добавление заголовка в макет
-        layout.addWidget(title)
-        
-        # Создание макета формы
-        form = QFormLayout()
-        
-        # Создание поля для выбора даты заказа
-        self.date_input = QDateEdit()
-        # Установка текущей даты по умолчанию
-        self.date_input.setDate(QDate.currentDate())
-        # Включение всплывающего календаря
-        self.date_input.setCalendarPopup(True)
-        # Добавление поля в форму с меткой
-        form.addRow("Дата заказа:", self.date_input)
-        
-        # Создание выпадающего списка для выбора поставщика
-        self.supplier_input = QComboBox()
-        # Добавление поставщиков в выпадающий список
-        for supplier_id, supplier_name in self.suppliers:
-            self.supplier_input.addItem(supplier_name, supplier_id)
-        # Добавление выпадающего списка в форму с меткой
-        form.addRow("Поставщик:", self.supplier_input)
-        
-        # Создание поля для ввода суммы заказа
-        self.amount_input = QDoubleSpinBox()
-        # Установка диапазона значений суммы
-        self.amount_input.setRange(0.01, 10000000.00)
-        # Установка значения по умолчанию
-        self.amount_input.setValue(0.01)
-        # Установка шага изменения значения
-        self.amount_input.setSingleStep(100.00)
-        # Добавление символа валюты
-        self.amount_input.setPrefix("₽ ")
-        # Добавление поля в форму с меткой
-        form.addRow("Сумма заказа:", self.amount_input)
-        
-        # Создание выпадающего списка для выбора статуса
-        self.status_input = QComboBox()
-        # Список возможных статусов заказа
-        statuses = ["в обработке", "доставлен", "отменен"]
-        # Добавление статусов в выпадающий список
-        self.status_input.addItems(statuses)
-        # Добавление выпадающего списка в форму с меткой
-        form.addRow("Статус:", self.status_input)
-        
-        # Создание поля для ввода примечания
-        self.note_input = QTextEdit()
-        # Установка подсказки для поля
-        self.note_input.setPlaceholderText("Введите примечание к заказу (необязательно)")
-        # Установка максимальной высоты поля
-        self.note_input.setMaximumHeight(80)
-        # Добавление поля в форму с меткой
-        form.addRow("Примечание:", self.note_input)
-        
-        # Добавление формы в основной макет
-        layout.addLayout(form)
-        
-        # Создание панели кнопок
-        button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | 
-            QDialogButtonBox.StandardButton.Cancel
-        )
-        # Подключение сигналов к кнопкам
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
-        
-        # Добавление панели кнопок в макет
-        layout.addWidget(button_box)
-        # Установка макета для окна
-        self.setLayout(layout)
-    
-    # Метод для получения данных о заказе
-    def get_order_data(self):
-        # Возврат словаря с данными заказа
+                total += float(self.order_items_table.item(row, 4).text())
+            except (ValueError, AttributeError):
+                pass # Ignore if cell is empty or invalid
+        self.total_label.setText(f"Общая сумма заказа: {total:.2f}")
+
+    def get_data(self):
+        supplier_index = self.supplier_combo.currentIndex()
+        if supplier_index <= 0:
+            QMessageBox.warning(self, "Ошибка", "Пожалуйста, выберите поставщика.")
+            return None
+
+        supplier_id = self.supplier_combo.itemData(supplier_index)
+        items = []
+        total_order_amount = 0.0
+
+        if self.order_items_table.rowCount() == 0:
+            QMessageBox.warning(self, "Ошибка", "Добавьте хотя бы один товар в заказ.")
+            return None
+
+        for row in range(self.order_items_table.rowCount()):
+            try:
+                item_data = {
+                    "product_id": int(self.order_items_table.item(row, 0).text()),
+                    "quantity": int(self.order_items_table.item(row, 2).text()),
+                    "unit_price": float(self.order_items_table.item(row, 3).text()),
+                    "total_price": float(self.order_items_table.item(row, 4).text())
+                }
+                items.append(item_data)
+                total_order_amount += item_data["total_price"]
+            except (ValueError, AttributeError) as e:
+                QMessageBox.critical(self, "Ошибка данных", f"Ошибка в строке {row+1} таблицы заказа: {e}")
+                return None
+
         return {
-            "date": self.date_input.date().toString("yyyy-MM-dd"),
-            "supplier_id": self.supplier_input.currentData(),
-            "amount": self.amount_input.value(),
-            "status": self.status_input.currentText(),
-            "note": self.note_input.toPlainText()
+            "supplier_id": supplier_id,
+            "items": items,
+            "total_amount": total_order_amount
         }
+
+    # Оставляем для совместимости
+    def get_order_data(self):
+        return self.get_data()
 
 # Класс диалогового окна для добавления склада
 class AddWarehouseDialog(QDialog):
@@ -1179,4 +1285,221 @@ class EmailDialog(QDialog):
             "to": self.to_input.text(),
             "subject": self.subject_input.text(),
             "message": self.message_input.toPlainText()
-        } 
+        }
+    
+class CreatePurchaseOrderDialog(BaseDialog):
+    """Dialog to create a new purchase order."""
+    def __init__(self, db, parent=None):
+        super().__init__("Создать заказ поставщику", parent)
+        self.db = db
+        self.setMinimumSize(600, 500)
+
+        # --- Top Section: Supplier and Product Selection ---
+        selection_layout = QFormLayout()
+
+        self.supplier_combo = QComboBox()
+        self.product_combo = QComboBox()
+        self.quantity_spin = QSpinBox()
+        self.quantity_spin.setMinimum(1)
+        self.quantity_spin.setMaximum(9999)
+        self.price_spin = QDoubleSpinBox() # Price might be fetched or entered
+        self.price_spin.setDecimals(2)
+        self.price_spin.setMinimum(0.01)
+        self.price_spin.setMaximum(99999.99)
+        self.btn_add_item = QPushButton("Добавить товар в заказ")
+
+        selection_layout.addRow("Поставщик:", self.supplier_combo)
+        selection_layout.addRow("Товар:", self.product_combo)
+        selection_layout.addRow("Цена за ед.:", self.price_spin) # Allow manual entry/override
+        selection_layout.addRow("Количество:", self.quantity_spin)
+        selection_layout.addRow("", self.btn_add_item)
+
+        self.layout.insertLayout(0, selection_layout) # Insert before button box
+
+        # --- Middle Section: Order Items Table ---
+        self.order_items_table = QTableWidget()
+        self.order_items_table.setColumnCount(5) # Product ID, Name, Qty, Unit Price, Total
+        self.order_items_table.setHorizontalHeaderLabels(["ID Товара", "Название", "Кол-во", "Цена", "Итого"])
+        self.order_items_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.order_items_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        # self.order_items_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.order_items_table.verticalHeader().setVisible(False)
+        self.layout.insertWidget(1, self.order_items_table)
+
+        # Добавляем кнопку удаления товара
+        remove_button_layout = QHBoxLayout()
+        self.btn_remove_item = QPushButton("Удалить выбранный товар")
+        self.btn_remove_item.setStyleSheet("background-color: #d32f2f; color: white;")
+        remove_button_layout.addStretch()
+        remove_button_layout.addWidget(self.btn_remove_item)
+        self.layout.insertLayout(2, remove_button_layout)
+
+        # --- Bottom Section: Total Amount and Buttons ---
+        total_layout = QHBoxLayout()
+        self.total_label = QLabel("Общая сумма заказа: 0.00")
+        total_layout.addStretch()
+        total_layout.addWidget(self.total_label)
+        self.layout.insertLayout(3, total_layout)
+        
+        # --- Load Data & Connect Signals ---
+        self.load_suppliers()
+        self.load_products()
+        self.btn_add_item.clicked.connect(self.add_item_to_order)
+        self.btn_remove_item.clicked.connect(self.remove_item_from_order)
+        self.product_combo.currentIndexChanged.connect(self.update_price_from_product) # Auto-fill price
+
+    def load_suppliers(self):
+        try:
+            self.supplier_combo.clear()
+            self.db.cursor.execute("SELECT supplier_id, supplier_name FROM suppliers ORDER BY supplier_name")
+            suppliers = self.db.cursor.fetchall()
+            if not suppliers:
+                self.supplier_combo.addItem("Нет доступных поставщиков", -1)
+                self.supplier_combo.setEnabled(False)
+            else:
+                self.supplier_combo.addItem("Выберите поставщика...", -1)
+                for supplier_id, name in suppliers:
+                    self.supplier_combo.addItem(name, supplier_id)
+        except Exception as e:
+            logging.error(f"Ошибка загрузки поставщиков для диалога: {e}")
+            QMessageBox.critical(self, "Ошибка БД", "Не удалось загрузить список поставщиков.")
+
+    def load_products(self):
+        try:
+            self.product_combo.clear()
+            # Store price along with ID and name
+            self.db.cursor.execute("SELECT product_id, product_name, unit_price FROM products ORDER BY product_name")
+            products = self.db.cursor.fetchall()
+            if not products:
+                self.product_combo.addItem("Нет доступных товаров", -1)
+                self.product_combo.setEnabled(False)
+            else:
+                self.product_combo.addItem("Выберите товар...", (-1, 0.0))
+                for product_id, name, price in products:
+                    self.product_combo.addItem(name, (product_id, float(price)))
+        except Exception as e:
+            logging.error(f"Ошибка загрузки товаров для диалога: {e}")
+            QMessageBox.critical(self, "Ошибка БД", "Не удалось загрузить список товаров.")
+
+    def update_price_from_product(self, index):
+        if index > 0: # Ignore placeholder
+            data = self.product_combo.itemData(index)
+            if isinstance(data, tuple) and len(data) == 2:
+                product_id, unit_price = data
+                if product_id != -1:
+                    self.price_spin.setValue(unit_price)
+
+    def add_item_to_order(self):
+        product_index = self.product_combo.currentIndex()
+        if product_index <= 0: # Placeholder selected
+            QMessageBox.warning(self, "Ошибка", "Пожалуйста, выберите товар.")
+            return
+
+        data = self.product_combo.itemData(product_index)
+        if isinstance(data, tuple) and len(data) == 2:
+            product_id, _ = data  # игнорируем price из tuple, используем введенный price
+        else:
+            # Если данные в другом формате
+            product_id = data
+            
+        product_name = self.product_combo.currentText()
+        quantity = self.quantity_spin.value()
+        entered_price = self.price_spin.value()  # Use entered/updated price
+
+        if quantity <= 0 or entered_price <= 0:
+            QMessageBox.warning(self, "Ошибка", "Количество и цена должны быть больше нуля.")
+            return
+
+        # Check if product already in table
+        for row in range(self.order_items_table.rowCount()):
+            if self.order_items_table.item(row, 0).text() == str(product_id):
+                QMessageBox.warning(self, "Дубликат", f"Товар '{product_name}' уже добавлен в заказ.")
+                return
+
+        # Add row to table
+        row_count = self.order_items_table.rowCount()
+        self.order_items_table.insertRow(row_count)
+
+        total_item_price = quantity * entered_price
+
+        self.order_items_table.setItem(row_count, 0, QTableWidgetItem(str(product_id)))
+        self.order_items_table.setItem(row_count, 1, QTableWidgetItem(product_name))
+        self.order_items_table.setItem(row_count, 2, QTableWidgetItem(str(quantity)))
+        self.order_items_table.setItem(row_count, 3, QTableWidgetItem(f"{entered_price:.2f}"))
+        self.order_items_table.setItem(row_count, 4, QTableWidgetItem(f"{total_item_price:.2f}"))
+
+        self.update_total_amount()
+        # Reset selection fields
+        self.product_combo.setCurrentIndex(0)
+        self.quantity_spin.setValue(1)
+        self.price_spin.setValue(0.01)
+
+    def remove_item_from_order(self):
+        """Удаление выбранного товара из таблицы заказа"""
+        selected_rows = self.order_items_table.selectedIndexes()
+        if not selected_rows:
+            QMessageBox.warning(self, "Внимание", "Выберите товар для удаления из заказа")
+            return
+            
+        # Получение номера строки
+        row = selected_rows[0].row()
+        product_name = self.order_items_table.item(row, 1).text()
+        
+        # Подтверждение удаления
+        if QMessageBox.question(
+            self, 
+            "Подтверждение удаления", 
+            f"Вы действительно хотите удалить товар '{product_name}' из заказа?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        ) == QMessageBox.StandardButton.Yes:
+            # Удаление строки
+            self.order_items_table.removeRow(row)
+            # Обновление общей суммы
+            self.update_total_amount()
+
+    def update_total_amount(self):
+        total = 0.0
+        for row in range(self.order_items_table.rowCount()):
+            try:
+                total += float(self.order_items_table.item(row, 4).text())
+            except (ValueError, AttributeError):
+                pass # Ignore if cell is empty or invalid
+        self.total_label.setText(f"Общая сумма заказа: {total:.2f}")
+
+    def get_data(self):
+        supplier_index = self.supplier_combo.currentIndex()
+        if supplier_index <= 0:
+            QMessageBox.warning(self, "Ошибка", "Пожалуйста, выберите поставщика.")
+            return None
+
+        supplier_id = self.supplier_combo.itemData(supplier_index)
+        items = []
+        total_order_amount = 0.0
+
+        if self.order_items_table.rowCount() == 0:
+            QMessageBox.warning(self, "Ошибка", "Добавьте хотя бы один товар в заказ.")
+            return None
+
+        for row in range(self.order_items_table.rowCount()):
+            try:
+                item_data = {
+                    "product_id": int(self.order_items_table.item(row, 0).text()),
+                    "quantity": int(self.order_items_table.item(row, 2).text()),
+                    "unit_price": float(self.order_items_table.item(row, 3).text()),
+                    "total_price": float(self.order_items_table.item(row, 4).text())
+                }
+                items.append(item_data)
+                total_order_amount += item_data["total_price"]
+            except (ValueError, AttributeError) as e:
+                QMessageBox.critical(self, "Ошибка данных", f"Ошибка в строке {row+1} таблицы заказа: {e}")
+                return None
+
+        return {
+            "supplier_id": supplier_id,
+            "items": items,
+            "total_amount": total_order_amount
+        }
+
+    # Оставляем для совместимости
+    def get_order_data(self):
+        return self.get_data() 

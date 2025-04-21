@@ -1,12 +1,13 @@
 from PyQt6.QtWidgets import (
     QWidget, QTableWidget, QTableWidgetItem, QVBoxLayout,
     QHBoxLayout, QPushButton, QLineEdit, QHeaderView, QMessageBox, 
-    QLabel, QComboBox, QSpacerItem, QSizePolicy
+    QLabel, QComboBox, QSpacerItem, QSizePolicy, QDialog, QSplitter, QMenu, QInputDialog, QFileDialog
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QDate
 from PyQt6.QtGui import QIcon
 import logging
-from dialogs import AddOrderDialog, ConfirmDialog, ExportDialog
+from dialogs import AddOrderDialog, ConfirmDialog, ExportDialog, CreatePurchaseOrderDialog
+import datetime
 
 class OrdersTab(QWidget):
     """
@@ -67,6 +68,9 @@ class OrdersTab(QWidget):
         top_panel.addItem(spacer)
         top_panel.addWidget(self.search)
 
+        # Splitter for Orders and Order Items tables
+        splitter = QSplitter(Qt.Orientation.Vertical)
+
         # Создание таблицы для отображения заказов
         self.orders_table = QTableWidget()
         self.orders_table.setColumnCount(6)
@@ -77,6 +81,26 @@ class OrdersTab(QWidget):
         self.orders_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         # Настройка автоматического изменения размера строк
         self.orders_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+
+        self.orders_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.orders_table.customContextMenuRequested.connect(self.show_order_context_menu)
+        self.orders_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows) # Select whole rows
+        self.orders_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers) # Make read-only
+        self.orders_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        splitter.addWidget(self.orders_table)
+        # Order Items Table
+        self.order_items_table = QTableWidget()
+        # Columns for order_items table: order_item_id, product_id, quantity, unit_price, total_price
+        self.order_items_table.setColumnCount(5)
+        self.order_items_table.setHorizontalHeaderLabels(
+            ["ID Позиции", "Товар", "Кол-во", "Цена за ед.", "Итого"]
+        )
+        self.order_items_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.order_items_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        splitter.addWidget(self.order_items_table)
+
+        # Set initial sizes for splitter panes (optional)
+        splitter.setSizes([400, 200])
 
         # Создание нижней панели с дополнительными функциями
         bottom_panel = QHBoxLayout()
@@ -118,14 +142,15 @@ class OrdersTab(QWidget):
 
         # Сборка основного интерфейса
         main_layout.addLayout(top_panel)
-        main_layout.addWidget(self.orders_table)
+        main_layout.addWidget(splitter)
         main_layout.addLayout(bottom_panel)
+
 
         # Установка основного макета
         self.setLayout(main_layout)
 
         # Подключение обработчиков событий
-        self.btn_add.clicked.connect(self.add_order)
+        self.btn_add.clicked.connect(self.create_purchase_order)
         self.btn_edit.clicked.connect(self.edit_order)
         self.btn_cancel.clicked.connect(self.cancel_order)
         self.btn_refresh.clicked.connect(self.load_orders)
@@ -133,10 +158,15 @@ class OrdersTab(QWidget):
         self.btn_export.clicked.connect(self.export_data)
         self.search.textChanged.connect(self.handle_search)
         self.status_filter.currentIndexChanged.connect(self.apply_filters)
+        # Добавление сигнала для загрузки позиций заказа при выборе
+        self.orders_table.itemSelectionChanged.connect(self.load_order_items)
 
     def load_orders(self):
         """Загрузка заказов из базы данных и отображение в таблице"""
         try:
+            # Очистка таблицы позиций при перезагрузке заказов
+            self.order_items_table.setRowCount(0)
+            
             # SQL-запрос для получения списка заказов
             query = """
                 SELECT o.order_id, o.order_date, s.supplier_name, o.total_amount, 
@@ -168,6 +198,10 @@ class OrdersTab(QWidget):
                         elif data == "в обработке":
                             item.setForeground(Qt.GlobalColor.blue)
                     
+                    # Форматирование денежных сумм
+                    if col_idx == 3:  # Столбец с суммой
+                        item = QTableWidgetItem(f"{data:.2f}")
+                    
                     # Установка элемента в таблицу
                     self.orders_table.setItem(row_idx, col_idx, item)
             
@@ -187,6 +221,9 @@ class OrdersTab(QWidget):
     def apply_filters(self):
         """Применение фильтров к таблице заказов"""
         try:
+            # Очистка таблицы позиций при фильтрации заказов
+            self.order_items_table.setRowCount(0)
+        
             # Получение текста поиска
             search_text = self.search.text()
             # Получение выбранного статуса
@@ -240,6 +277,10 @@ class OrdersTab(QWidget):
                         elif data == "в обработке":
                             item.setForeground(Qt.GlobalColor.blue)
                     
+                    # Форматирование денежных сумм
+                    if col_idx == 3:  # Столбец с суммой
+                        item = QTableWidgetItem(f"{data:.2f}")
+                    
                     self.orders_table.setItem(row_idx, col_idx, item)
             
             # Обновление счетчика заказов
@@ -248,42 +289,61 @@ class OrdersTab(QWidget):
         except Exception as e:
             # Логирование ошибки
             logging.error(f"Ошибка фильтрации заказов: {str(e)}")
+    
+    def load_order_items(self):
+        """Загружает позиции для выбранного заказа в нижнюю таблицу."""
+        try:
+            # Получение выбранных строк
+            selected_rows = self.orders_table.selectionModel().selectedRows()
+            if not selected_rows:
+                # Очистка таблицы товаров, если заказ не выбран
+                self.order_items_table.setRowCount(0)
+                return
 
-    def add_order(self):
-        """Отображение диалога создания нового заказа"""
-        # Создание диалога добавления заказа
-        dialog = AddOrderDialog(self, self.db)
-        if dialog.exec():
-            # Получение данных заказа из диалога
-            order_data = dialog.get_order_data()
-            try:
-                # SQL-запрос для добавления заказа
-                query = """
-                    INSERT INTO orders (order_date, supplier_id, total_amount, status)
-                    VALUES (%s, %s, %s, %s)
-                """
-                # Параметры запроса
-                params = (
-                    order_data["date"],
-                    order_data["supplier_id"],
-                    order_data["amount"],
-                    order_data["status"]
-                )
-                # Выполнение запроса
-                success = self.db.execute_query(query, params)
-                if success:
-                    # Обновление списка заказов
-                    self.load_orders()
-                    # Отображение сообщения об успехе
-                    QMessageBox.information(self, "Успех", "Заказ успешно создан")
-                else:
-                    # Отображение сообщения об ошибке
-                    QMessageBox.warning(self, "Ошибка", "Не удалось создать заказ")
-            except Exception as e:
-                # Логирование ошибки
-                logging.error(f"Ошибка создания заказа: {str(e)}")
-                # Отображение сообщения об ошибке
-                QMessageBox.critical(self, "Ошибка", f"Не удалось создать заказ: {str(e)}")
+            # Получение индекса выбранной строки и ID заказа
+            selected_row_index = selected_rows[0].row()
+            order_id_item = self.orders_table.item(selected_row_index, 0)
+
+            if not order_id_item:
+                self.order_items_table.setRowCount(0)
+                return
+
+            order_id = int(order_id_item.text())
+
+            # Запрос позиций заказа с названиями товаров
+            query = """
+                SELECT oi.order_item_id, p.product_name, oi.quantity, oi.unit_price, oi.total_price
+                FROM order_items oi
+                JOIN products p ON oi.product_id = p.product_id
+                WHERE oi.order_id = %s
+                ORDER BY oi.order_item_id
+            """
+            items = self.db.fetch_all(query, (order_id,))
+
+            # Обновление заголовков таблицы позиций
+            self.order_items_table.setHorizontalHeaderLabels([
+                "ID", "Товар", "Количество", "Цена за ед.", "Итого"
+            ])
+
+            # Заполнение таблицы позиций заказа
+            self.order_items_table.setRowCount(len(items))
+            for row_idx, item_data in enumerate(items):
+                for col_idx, data in enumerate(item_data):
+                    # Создание элемента таблицы
+                    if col_idx in [3, 4]:  # Форматирование денежных значений
+                        table_item = QTableWidgetItem(f"{data:.2f}")
+                    else:
+                        table_item = QTableWidgetItem(str(data))
+                        
+                    # Запрет редактирования ячеек
+                    table_item.setFlags(table_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    self.order_items_table.setItem(row_idx, col_idx, table_item)
+
+        except Exception as e:
+            # Логирование ошибки и отображение сообщения
+            logging.error(f"Ошибка загрузки позиций заказа {order_id}: {str(e)}")
+            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить позиции заказа {order_id}")
+            self.order_items_table.setRowCount(0)
 
     def edit_order(self):
         """Редактирование выбранного заказа"""
@@ -306,70 +366,110 @@ class OrdersTab(QWidget):
             return
             
         try:
-            # Получение данных заказа
-            query = """
-                SELECT order_date, supplier_id, total_amount, status 
-                FROM orders 
-                WHERE order_id = %s
-            """
-            order_data = self.db.fetch_one(query, (order_id,))
-            
-            if order_data:
-                # Создание диалога редактирования
-                dialog = AddOrderDialog(self, self.db)
-                dialog.setWindowTitle("Редактировать заказ")
-                
-                # Установка текущих данных в поля диалога
-                dialog.date_input.setDate(Qt.QDate.fromString(str(order_data[0]), "yyyy-MM-dd"))
-                
-                # Поиск индекса поставщика
-                supplier_idx = -1
-                for i in range(dialog.supplier_input.count()):
-                    if dialog.supplier_input.itemData(i) == order_data[1]:
-                        supplier_idx = i
-                        break
-                if supplier_idx >= 0:
-                    dialog.supplier_input.setCurrentIndex(supplier_idx)
-                
-                # Установка суммы
-                dialog.amount_input.setValue(float(order_data[2]))
-                
-                # Поиск индекса статуса
-                status_idx = dialog.status_input.findText(order_data[3])
-                if status_idx >= 0:
-                    dialog.status_input.setCurrentIndex(status_idx)
-                
-                if dialog.exec():
-                    # Получение обновленных данных
-                    updated_data = dialog.get_order_data()
-                    # SQL-запрос для обновления заказа
-                    update_query = """
-                        UPDATE orders 
-                        SET order_date = %s, 
-                            supplier_id = %s, 
-                            total_amount = %s, 
-                            status = %s,
-                            updated_at = CURRENT_TIMESTAMP
-                        WHERE order_id = %s
-                    """
-                    # Параметры запроса
-                    update_params = (
-                        updated_data["date"],
-                        updated_data["supplier_id"],
-                        updated_data["amount"],
-                        updated_data["status"],
-                        order_id
-                    )
-                    # Выполнение запроса
-                    success = self.db.execute_query(update_query, update_params)
-                    if success:
-                        # Обновление списка заказов
-                        self.load_orders()
-                        # Отображение сообщения об успехе
-                        QMessageBox.information(self, "Успех", "Заказ успешно обновлен")
-                    else:
-                        # Отображение сообщения об ошибке
-                        QMessageBox.warning(self, "Ошибка", "Не удалось обновить заказ")
+           # Получаем текущие данные заказа
+           query_order = """
+               SELECT o.supplier_id, o.total_amount, o.status
+               FROM orders o
+               WHERE o.order_id = %s
+           """
+           self.db.cursor.execute(query_order, (order_id,))
+           order_data = self.db.cursor.fetchone()
+           
+           if not order_data:
+               QMessageBox.critical(self, "Ошибка", f"Информация о заказе ID {order_id} не найдена.")
+               return
+                   
+           # Получаем позиции заказа
+           query_items = """
+               SELECT oi.order_item_id, oi.product_id, p.product_name, oi.quantity, oi.unit_price, oi.total_price
+               FROM order_items oi
+               JOIN products p ON oi.product_id = p.product_id
+               WHERE oi.order_id = %s
+               ORDER BY oi.order_item_id
+           """
+           self.db.cursor.execute(query_items, (order_id,))
+           order_items = self.db.cursor.fetchall()
+           
+           # Создаем диалог редактирования заказа
+           edit_dialog = AddOrderDialog(self, self.db)
+           edit_dialog.setWindowTitle("Редактировать заказ")
+           
+           # Заполняем диалог текущими данными
+           # Устанавливаем поставщика
+           supplier_idx = edit_dialog.supplier_combo.findData(order_data[0])
+           if supplier_idx >= 0:
+               edit_dialog.supplier_combo.setCurrentIndex(supplier_idx)
+           
+           # Заполняем таблицу товаров
+           for item in order_items:
+               row = edit_dialog.order_items_table.rowCount()
+               edit_dialog.order_items_table.insertRow(row)
+               
+               edit_dialog.order_items_table.setItem(row, 0, QTableWidgetItem(str(item[1])))  # product_id
+               edit_dialog.order_items_table.setItem(row, 1, QTableWidgetItem(item[2]))       # product_name
+               edit_dialog.order_items_table.setItem(row, 2, QTableWidgetItem(str(item[3])))  # quantity
+               edit_dialog.order_items_table.setItem(row, 3, QTableWidgetItem(f"{item[4]:.2f}"))  # unit_price
+               edit_dialog.order_items_table.setItem(row, 4, QTableWidgetItem(f"{item[5]:.2f}"))  # total_price
+           
+           edit_dialog.update_total_amount()
+           
+           # Если пользователь подтвердил изменения
+           if edit_dialog.exec():
+               # Получаем обновленные данные
+               updated_data = edit_dialog.get_data()
+               if not updated_data:
+                   return
+               
+               # Начинаем транзакцию
+               try:
+                   # Обновляем основную информацию о заказе
+                   update_query = """
+                       UPDATE orders 
+                       SET supplier_id = %s, 
+                           total_amount = %s,
+                           updated_at = CURRENT_TIMESTAMP
+                       WHERE order_id = %s
+                   """
+                   update_params = (
+                       updated_data["supplier_id"],
+                       updated_data["total_amount"],
+                       order_id
+                   )
+                   self.db.cursor.execute(update_query, update_params)
+                   
+                   # Удаляем старые позиции заказа
+                   delete_items_query = "DELETE FROM order_items WHERE order_id = %s"
+                   self.db.cursor.execute(delete_items_query, (order_id,))
+                   
+                   # Добавляем новые позиции заказа
+                   for item in updated_data["items"]:
+                       insert_item_query = """
+                           INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price)
+                           VALUES (%s, %s, %s, %s, %s)
+                       """
+                       item_params = (
+                           order_id,
+                           item["product_id"],
+                           item["quantity"],
+                           item["unit_price"],
+                           item["total_price"]
+                       )
+                       # Выполнение запроса
+                       self.db.cursor.execute(insert_item_query, item_params)
+                   
+                   # Фиксируем транзакцию
+                   self.db.conn.commit()
+                   # Обновление списка заказов
+                   self.load_orders()
+                   # Отображение сообщения об успехе
+                   QMessageBox.information(self, "Успех", "Заказ успешно обновлен")
+               except Exception as tx_error:
+                   # Откатываем изменения при ошибке
+                   self.db.conn.rollback()
+                   # Логирование ошибки
+                   logging.error(f"Ошибка транзакции в редактировании заказа: {str(tx_error)}")
+                   # Отображение сообщения об ошибке
+                   QMessageBox.critical(self, "Ошибка транзакции", f"Не удалось обновить заказ: {str(tx_error)}")
         except Exception as e:
             # Логирование ошибки
             logging.error(f"Ошибка редактирования заказа: {str(e)}")
@@ -569,4 +669,287 @@ class OrdersTab(QWidget):
                 # Логирование ошибки
                 logging.error(f"Ошибка экспорта заказов: {str(e)}")
                 # Отображение сообщения об ошибке
-                QMessageBox.critical(self, "Ошибка", f"Ошибка при экспорте данных: {str(e)}") 
+                QMessageBox.critical(self, "Ошибка", f"Ошибка при экспорте данных: {str(e)}")
+
+    def create_purchase_order(self):
+         """Создает новый заказ поставщику через диалог."""
+         try:
+             dialog = CreatePurchaseOrderDialog(self.db, self) # Pass db and parent
+             if dialog.exec() == QDialog.DialogCode.Accepted:
+                 data = dialog.get_data()
+                 if not data:
+                     # Dialog already showed specific error, just return
+                     return
+
+                 supplier_id = data['supplier_id']
+                 items_data = data['items']
+                 total_amount = data['total_amount']
+
+                 # Use transaction for order + items insertion
+                 order_id = None
+                 try:
+                     # 1. Create order entry
+                     order_query = """
+                         INSERT INTO orders (order_date, supplier_id, total_amount, status)
+                         VALUES (CURRENT_DATE, %s, %s, 'в обработке')
+                         RETURNING order_id
+                     """
+                     # Use execute_query which handles commit/rollback on its own for single query
+                     # We need manual control here for transaction
+                     self.db.cursor.execute(order_query, (supplier_id, total_amount))
+                     result = self.db.cursor.fetchone()
+                     if not result:
+                         raise Exception("Не удалось получить ID созданного заказа.")
+                     order_id = result[0]
+
+                     # 2. Create order_items entries
+                     item_query = """
+                         INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price)
+                         VALUES (%s, %s, %s, %s, %s)
+                     """
+                     items_to_insert = [
+                         (order_id, item['product_id'], item['quantity'], item['unit_price'], item['total_price'])
+                         for item in items_data
+                     ]
+                     # executemany doesn't return anything useful here
+                     self.db.cursor.executemany(item_query, items_to_insert)
+
+                     # If all inserts succeeded, commit the transaction
+                     self.db.conn.commit()
+                     self.load_orders() # Refresh the orders list
+                     QMessageBox.information(self, "Успех", f"Заказ ID {order_id} успешно создан!")
+
+                 except Exception as transaction_error:
+                     # Rollback transaction on any error during insert
+                     self.db.conn.rollback()
+                     logging.error(f"Ошибка транзакции при создании заказа: {transaction_error}")
+                     QMessageBox.critical(self, "Ошибка транзакции", f"Не удалось создать заказ (ID заказа={order_id}): {transaction_error}")
+
+         except Exception as dialog_error:
+              logging.error(f"Ошибка диалога создания заказа: {dialog_error}")
+              QMessageBox.critical(self, "Ошибка", f"Ошибка при создании заказа: {dialog_error}")
+
+    def view_order_details(self):
+        """Показывает детальную информацию о заказе в отдельном диалоге."""
+        try:
+            selected_row = self.orders_table.currentRow()
+            if selected_row == -1:
+                QMessageBox.warning(self, "Внимание", "Выберите заказ для просмотра деталей.")
+                return
+
+            # Получаем ID заказа
+            order_id_item = self.orders_table.item(selected_row, 0)
+            if not order_id_item:
+                QMessageBox.warning(self, "Ошибка", "Не удалось получить ID заказа.")
+                return
+                
+            order_id = int(order_id_item.text())
+            
+            # Запрашиваем полную информацию о заказе с присоединением имени поставщика
+            query_order = """
+                SELECT o.order_id, o.order_date, s.supplier_name, o.total_amount, o.status, o.created_at, o.updated_at
+                FROM orders o
+                JOIN suppliers s ON o.supplier_id = s.supplier_id
+                WHERE o.order_id = %s
+            """
+            self.db.cursor.execute(query_order, (order_id,))
+            order_details = self.db.cursor.fetchone()
+            
+            if not order_details:
+                QMessageBox.critical(self, "Ошибка", f"Информация о заказе ID {order_id} не найдена.")
+                return
+                
+            # Запрашиваем позиции заказа с названиями товаров
+            query_items = """
+                SELECT oi.order_item_id, p.product_name, oi.quantity, oi.unit_price, oi.total_price
+                FROM order_items oi
+                JOIN products p ON oi.product_id = p.product_id
+                WHERE oi.order_id = %s
+                ORDER BY oi.order_item_id
+            """
+            self.db.cursor.execute(query_items, (order_id,))
+            order_items = self.db.cursor.fetchall()
+            
+            # Создаем диалог для отображения деталей
+            details_dialog = QDialog(self)
+            details_dialog.setWindowTitle(f"Детали заказа №{order_id}")
+            details_dialog.setMinimumSize(600, 500)
+            
+            layout = QVBoxLayout(details_dialog)
+            
+            # Заголовок заказа
+            heading_layout = QVBoxLayout()
+            
+            # Основная информация
+            order_date = QLabel(f"<b>Дата заказа:</b> {order_details[1]}")
+            supplier = QLabel(f"<b>Поставщик:</b> {order_details[2]}")
+            status = QLabel(f"<b>Статус:</b> {order_details[4]}")
+            total = QLabel(f"<b>Общая сумма:</b> {order_details[3]}")
+            
+            heading_layout.addWidget(QLabel(f"<h2>Заказ №{order_id}</h2>"))
+            heading_layout.addWidget(order_date)
+            heading_layout.addWidget(supplier)
+            heading_layout.addWidget(status)
+            heading_layout.addWidget(total)
+            
+            # Метаданные
+            created_updated = QLabel(f"<small>Создан: {order_details[5]} | Обновлен: {order_details[6]}</small>")
+            heading_layout.addWidget(created_updated)
+            
+            layout.addLayout(heading_layout)
+            
+            # Таблица позиций заказа
+            layout.addWidget(QLabel("<h3>Позиции заказа:</h3>"))
+            
+            items_table = QTableWidget()
+            items_table.setColumnCount(5)
+            items_table.setHorizontalHeaderLabels(["ID", "Товар", "Количество", "Цена за ед.", "Итого"])
+            items_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+            items_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+            
+            # Заполняем таблицу
+            items_table.setRowCount(len(order_items))
+            for row, item in enumerate(order_items):
+                for col, value in enumerate(item):
+                    table_item = QTableWidgetItem(str(value))
+                    table_item.setFlags(table_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    items_table.setItem(row, col, table_item)
+            
+            layout.addWidget(items_table)
+            
+            # Кнопка закрытия
+            btn_close = QPushButton("Закрыть")
+            btn_close.clicked.connect(details_dialog.close)
+            btn_close.setFixedWidth(100)
+            
+            # Кнопка экспорта в PDF
+            btn_export_pdf = QPushButton("Экспорт в PDF")
+            btn_export_pdf.clicked.connect(lambda: self.export_order_details_to_pdf(order_id, order_details, order_items))
+            btn_export_pdf.setFixedWidth(150)
+            
+            button_layout = QHBoxLayout()
+            button_layout.addStretch()
+            button_layout.addWidget(btn_export_pdf)
+            button_layout.addWidget(btn_close)
+            
+            layout.addLayout(button_layout)
+            
+            # Отображаем диалог
+            details_dialog.exec()
+            
+        except Exception as e:
+            logging.error(f"Ошибка отображения деталей заказа: {str(e)}")
+            QMessageBox.critical(self, "Ошибка", f"Не удалось отобразить детали заказа: {str(e)}")
+
+    def export_order_details_to_pdf(self, order_id, order_details, order_items):
+        """Экспортирует детали заказа в PDF файл."""
+        try:
+            # Импортируем необходимый класс для экспорта
+            from data_export import DataExporter
+            
+            # Создаем экспортер
+            exporter = DataExporter(self)
+            
+            # Используем метод export_order_details_to_pdf из класса DataExporter
+            exporter.export_order_details_to_pdf(order_id, order_details, order_items)
+            
+        except Exception as e:
+            logging.error(f"Ошибка при экспорте деталей заказа в PDF: {str(e)}")
+            QMessageBox.critical(self, "Ошибка", f"Не удалось экспортировать детали заказа: {str(e)}")
+
+    def show_order_context_menu(self, position):
+        """Показывает контекстное меню для строки заказа."""
+        selected_rows = self.orders_table.selectionModel().selectedRows()
+        if not selected_rows:
+            return # Don't show menu if no row selected
+
+        try:
+            menu = QMenu()
+            change_status_action = menu.addAction("Изменить статус")
+            change_status_action.triggered.connect(self.change_order_status)
+            
+            # Добавляем пункт просмотра деталей заказа
+            view_details_action = menu.addAction("Просмотр деталей")
+            view_details_action.triggered.connect(self.view_order_details)
+            
+            menu.exec(self.orders_table.viewport().mapToGlobal(position))
+        except Exception as e:
+            logging.error(f"Ошибка контекстного меню заказа: {str(e)}")
+
+    def change_order_status(self):
+        """Изменяет статус выбранного заказа."""
+        try:
+            selected_row = self.orders_table.currentRow()
+            if selected_row == -1:
+                QMessageBox.warning(self, "Внимание", "Выберите заказ для изменения статуса.")
+                return
+
+            # Get order ID and current status
+            order_id_item = self.orders_table.item(selected_row, 0)
+            current_status_item = self.orders_table.item(selected_row, 4)
+
+            if not order_id_item or not current_status_item:
+                QMessageBox.warning(self, "Ошибка", "Не удалось получить данные заказа.")
+                return
+
+            order_id = int(order_id_item.text())
+            current_status = current_status_item.text()
+            
+            # Логируем полученные данные
+            logging.debug(f"Изменение статуса заказа ID: {order_id}, текущий статус: {current_status}")
+
+            # Get list of valid statuses from database (or hardcode them)
+            valid_statuses = ['в обработке', 'доставлен', 'отменен']
+            # Remove current status from options
+            valid_statuses.remove(current_status)
+
+            # Simple QInputDialog to select new status (can replace with custom dialog)
+            new_status, ok = QInputDialog.getItem(
+                self, "Изменить статус", f"Выберите новый статус для заказа #{order_id}:",
+                valid_statuses, 0, False
+            )
+
+            if ok and new_status != current_status:
+                # Особая обработка для статуса 'доставлен'
+                if new_status == 'доставлен' and current_status == 'в обработке':
+                    # Показываем подтверждение
+                    confirm = QMessageBox.question(
+                        self, 
+                        "Подтверждение доставки", 
+                        "При смене статуса на 'доставлен' будут автоматически обновлены остатки на складе. Продолжить?",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                    )
+                    
+                    if confirm != QMessageBox.StandardButton.Yes:
+                        return
+                    
+                    # Логируем SQL-запрос перед выполнением    
+                    query = "UPDATE orders SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE order_id = %s"
+                    logging.debug(f"SQL запрос: {query}, параметры: {(new_status, order_id)}")
+                    
+                    # Обновляем статус, остальное будет сделано триггером базы данных
+                    if self.db.execute_query(query, (new_status, order_id), self):
+                        self.load_orders() # Перезагружаем данные
+                        QMessageBox.information(
+                            self, 
+                            "Успех", 
+                            f"Статус заказа ID {order_id} обновлен на '{new_status}'!\n"
+                            f"Остатки на складе автоматически обновлены."
+                        )
+                    else:
+                        QMessageBox.critical(self, "Ошибка", f"Ошибка обновления статуса заказа ID {order_id}")
+                else:
+                    # Логируем SQL-запрос перед выполнением
+                    query = "UPDATE orders SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE order_id = %s"
+                    logging.debug(f"SQL запрос: {query}, параметры: {(new_status, order_id)}")
+                    
+                    # Стандартное обновление статуса
+                    if self.db.execute_query(query, (new_status, order_id), self):
+                        self.load_orders() # Reload orders to reflect change
+                        QMessageBox.information(self, "Успех", f"Статус заказа ID {order_id} обновлен на '{new_status}'!")
+                    else:
+                        QMessageBox.critical(self, "Ошибка", f"Ошибка обновления статуса заказа ID {order_id}")
+
+        except Exception as e:
+            logging.error(f"Ошибка изменения статуса заказа: {str(e)}")
+            QMessageBox.critical(self, "Ошибка", f"Ошибка при изменении статуса: {str(e)}")
