@@ -3,8 +3,8 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton,
     QMessageBox, QCheckBox, QHBoxLayout, QDialog, QFormLayout
 )
-# Импорт компонентов для работы со шрифтами
-from PyQt6.QtGui import QFont
+# Импорт компонентов для работы со шрифтами и графикой
+from PyQt6.QtGui import QFont, QPixmap, QIcon, QPalette, QBrush, QLinearGradient, QColor
 # Импорт базовых компонентов Qt
 from PyQt6.QtCore import Qt, pyqtSignal, QSettings
 # Импорт сервиса авторизации
@@ -29,8 +29,12 @@ class LoginWindow(QWidget):
         self.setWindowTitle("Система управления складом - Вход")
         # Установка фиксированного размера окна
         self.setFixedSize(500, 600)
+        # Установка иконки окна
+        self.setWindowIcon(QIcon("src/logo.png"))
         # Установка имени объекта для стилизации
         self.setObjectName("loginWidget")
+        # Настройка фона
+        self.setup_background()
         # Настройка пользовательского интерфейса
         self.setup_ui()
         # Применение стилей
@@ -51,8 +55,14 @@ class LoginWindow(QWidget):
 
         # Создание и настройка логотипа
         self.logo = QLabel()
-        self.logo.setText("СКЛАД")
-        self.logo.setFont(QFont("Arial", 32, QFont.Weight.Bold))
+        if os.path.exists("src/logo.png"):
+            pixmap = QPixmap("src/logo.png")
+            self.logo.setPixmap(pixmap.scaled(180, 180, 
+                                              Qt.AspectRatioMode.KeepAspectRatio,
+                                              Qt.TransformationMode.SmoothTransformation))
+        else:
+            self.logo.setText("СКЛАД")
+            self.logo.setFont(QFont("Arial", 32, QFont.Weight.Bold))
         self.logo.setObjectName("loginLogo")
         self.logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -169,6 +179,15 @@ class LoginWindow(QWidget):
             self.username_input.setText(username)
             self.password_input.setText(password)
             self.remember_check.setChecked(True)
+
+    def setup_background(self):
+        """Настройка статического фона"""
+        palette = self.palette()
+        gradient = QLinearGradient(0, 0, 0, self.height())
+        gradient.setColorAt(0, QColor("#e7f0fd"))
+        gradient.setColorAt(1, QColor("#accbee"))
+        palette.setBrush(QPalette.ColorRole.Window, QBrush(gradient))
+        self.setPalette(palette)
 
 
 class PasswordRecoveryDialog(QDialog):
