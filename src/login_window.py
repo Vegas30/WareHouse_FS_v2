@@ -1,3 +1,12 @@
+"""
+Модуль окна входа в систему
+
+Этот модуль предоставляет классы для авторизации пользователей
+в приложении системы управления складом.
+
+:author: Игорь Валуйсков
+:version: 1.0
+"""
 # Импорт необходимых компонентов из PyQt6
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton,
@@ -17,10 +26,23 @@ import os
 import logging
 
 class LoginWindow(QWidget):
+    """
+    Окно входа в систему управления складом.
+    
+    Предоставляет интерфейс для ввода учетных данных,
+    авторизации пользователей и восстановления пароля.
+    Имеет возможность запоминать учетные данные.
+    """
     # Сигнал успешной авторизации (передает имя пользователя и права администратора)
     login_success = pyqtSignal(str, bool)
 
     def __init__(self):
+        """
+        Инициализация окна входа.
+        
+        Настраивает внешний вид окна, создает элементы интерфейса
+        и загружает сохраненные учетные данные, если они есть.
+        """
         # Инициализация родительского класса
         super().__init__()
         # Создание объекта для хранения настроек
@@ -43,7 +65,13 @@ class LoginWindow(QWidget):
         self.load_saved_credentials()
 
     def setup_ui(self):
-        """Настройка пользовательского интерфейса"""
+        """
+        Настройка пользовательского интерфейса.
+        
+        Создает и размещает все элементы интерфейса окна входа:
+        логотип, поля ввода, кнопки и т.д.
+        Настраивает обработчики событий.
+        """
         # Создание основного вертикального layout
         main_layout = QVBoxLayout()
         # Выравнивание по центру
@@ -126,6 +154,16 @@ class LoginWindow(QWidget):
         self.forgot_btn.clicked.connect(self.show_password_recovery_dialog)
 
     def check_credentials(self):
+        """
+        Проверка введенных учетных данных.
+        
+        Получает введенные пользователем логин и пароль,
+        проверяет их корректность через сервис авторизации.
+        В случае успеха сохраняет учетные данные при необходимости
+        и отправляет сигнал успешной авторизации.
+        
+        :emits: login_success(str, bool) - при успешной авторизации
+        """
         # Получение введенных данных
         username = self.username_input.text()
         password = self.password_input.text()
@@ -154,24 +192,51 @@ class LoginWindow(QWidget):
             QMessageBox.warning(self, "Ошибка", "Неверный логин или пароль")
 
     def show_password_recovery_dialog(self):
+        """
+        Отображение диалога восстановления пароля.
+        
+        Создает и отображает модальный диалог для изменения
+        пароля пользователя. При успешном изменении показывает
+        информационное сообщение.
+        """
         # Создание и отображение диалога восстановления пароля
         dialog = PasswordRecoveryDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             QMessageBox.information(self, "Успех", "Пароль успешно изменен!")
 
     def save_credentials(self, username, password):
+        """
+        Сохранение учетных данных в настройки.
+        
+        :param username: Имя пользователя
+        :type username: str
+        :param password: Пароль пользователя
+        :type password: str
+        """
         # Сохранение учетных данных в настройках
         self.settings.setValue("username", username)
         self.settings.setValue("password", password)
         self.settings.setValue("remember", True)
 
     def clear_credentials(self):
+        """
+        Очистка сохраненных учетных данных из настроек.
+        
+        Удаляет сохраненные логин и пароль из настроек приложения.
+        """
         # Очистка сохраненных учетных данных
         self.settings.remove("username")
         self.settings.remove("password")
         self.settings.setValue("remember", False)
 
     def load_saved_credentials(self):
+        """
+        Загрузка сохраненных учетных данных.
+        
+        Загружает ранее сохраненные логин и пароль из настроек
+        и заполняет ими соответствующие поля, если установлен
+        флаг "Запомнить меня".
+        """
         # Загрузка сохраненных учетных данных
         if self.settings.value("remember", False, type=bool):
             username = self.settings.value("username", "", type=str)
@@ -181,7 +246,11 @@ class LoginWindow(QWidget):
             self.remember_check.setChecked(True)
 
     def setup_background(self):
-        """Настройка статического фона"""
+        """
+        Настройка статического фона окна.
+        
+        Создает градиентный фон для окна входа.
+        """
         palette = self.palette()
         gradient = QLinearGradient(0, 0, 0, self.height())
         gradient.setColorAt(0, QColor("#e7f0fd"))
@@ -191,7 +260,19 @@ class LoginWindow(QWidget):
 
 
 class PasswordRecoveryDialog(QDialog):
+    """
+    Диалог восстановления/изменения пароля.
+    
+    Предоставляет интерфейс для изменения пароля пользователя.
+    Требует ввода логина, текущего пароля и нового пароля.
+    """
     def __init__(self, parent=None):
+        """
+        Инициализация диалога восстановления пароля.
+        
+        :param parent: Родительский виджет
+        :type parent: QWidget или None
+        """
         # Инициализация родительского класса
         super().__init__(parent)
         # Установка заголовка окна
@@ -202,6 +283,13 @@ class PasswordRecoveryDialog(QDialog):
         self.setStyleSheet(DIALOG_STYLESHEET + LOGIN_STYLESHEET)
 
     def setup_ui(self):
+        """
+        Настройка пользовательского интерфейса диалога.
+        
+        Создает и размещает все элементы интерфейса диалога:
+        заголовок, поля ввода, кнопки и т.д.
+        Настраивает обработчики событий.
+        """
         # Создание основного вертикального layout
         layout = QVBoxLayout()
         # Установка отступов между элементами
@@ -281,6 +369,15 @@ class PasswordRecoveryDialog(QDialog):
         self.submit_btn.clicked.connect(self.change_password)
         
     def change_password(self):
+        """
+        Изменение пароля пользователя.
+        
+        Получает введенные пользователем данные, проверяет их корректность
+        и вызывает метод изменения пароля из сервиса авторизации.
+        
+        :returns: None
+        :raises: None
+        """
         # Получение введенных данных
         username = self.username_input.text()
         current_password = self.current_password.text()

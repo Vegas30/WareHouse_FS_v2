@@ -1,3 +1,12 @@
+"""
+Модуль аутентификации и управления пользователями.
+
+Этот модуль предоставляет класс AuthService для аутентификации пользователей,
+управления паролями и проверки прав доступа.
+
+:author: Игорь Валуйсков
+:version: 1.0
+"""
 # Импорт модуля для работы с PostgreSQL
 import psycopg2
 # Импорт класса для отображения диалоговых окон
@@ -11,6 +20,7 @@ from database import Database
 class AuthService:
     """
     Класс для аутентификации и управления пользователями.
+    
     Обеспечивает проверку учетных данных, смену пароля и проверку прав доступа.
     """
 
@@ -19,15 +29,13 @@ class AuthService:
         """
         Метод аутентификации пользователя (упрощенный, без хеширования).
         
-        Args:
-            username: Имя пользователя
-            password: Пароль пользователя
+        :param username: Имя пользователя
+        :type username: str
+        :param password: Пароль пользователя
+        :type password: str
             
-        Returns:
-            tuple: (success: bool, full_name: str, is_admin: bool)
-            - success: Успешность аутентификации
-            - full_name: Полное имя пользователя
-            - is_admin: Наличие прав администратора
+        :returns: Кортеж (успех, полное имя, админ)
+        :rtype: tuple[bool, str, bool]
         """
         try:
             # Создание подключения к базе данных
@@ -59,13 +67,15 @@ class AuthService:
         """
         Изменение пароля пользователя (упрощенный метод, без хеширования).
         
-        Args:
-            username: Имя пользователя
-            current_password: Текущий пароль
-            new_password: Новый пароль
+        :param username: Имя пользователя
+        :type username: str
+        :param current_password: Текущий пароль
+        :type current_password: str
+        :param new_password: Новый пароль
+        :type new_password: str
             
-        Returns:
-            bool: Успешность изменения пароля
+        :returns: Успешность изменения пароля
+        :rtype: bool
         """
         try:
             # Создание подключения к базе данных
@@ -94,11 +104,11 @@ class AuthService:
         """
         Получение информации о пользователе по его ID.
         
-        Args:
-            user_id: ID пользователя
+        :param user_id: ID пользователя
+        :type user_id: int
             
-        Returns:
-            dict: Словарь с информацией о пользователе или None, если пользователь не найден
+        :returns: Словарь с информацией о пользователе или None, если пользователь не найден
+        :rtype: dict или None
         """
         try:
             # SQL-запрос для получения данных пользователя
@@ -132,11 +142,11 @@ class AuthService:
         """
         Проверка наличия прав администратора у пользователя.
         
-        Args:
-            user_id: ID пользователя
+        :param user_id: ID пользователя
+        :type user_id: int
             
-        Returns:
-            bool: True, если пользователь является администратором, иначе False
+        :returns: True, если пользователь является администратором, иначе False
+        :rtype: bool
         """
         # Получение данных пользователя
         user = self.get_user_by_id(user_id)

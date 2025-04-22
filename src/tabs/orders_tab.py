@@ -19,8 +19,8 @@ class OrdersTab(QWidget):
         """
         Инициализация вкладки заказов.
         
-        Args:
-            db: Объект базы данных для операций с заказами
+        :param db: Объект базы данных для операций с заказами
+        :type db: DatabaseManager
         """
         super().__init__()
         # Сохранение объекта базы данных
@@ -31,7 +31,17 @@ class OrdersTab(QWidget):
         self.load_orders()
 
     def init_ui(self):
-        """Инициализация пользовательского интерфейса"""
+        """
+        Инициализация пользовательского интерфейса.
+        
+        Создает и настраивает все виджеты вкладки заказов:
+        
+        - Верхнюю панель с кнопками управления и фильтрами
+        - Таблицу заказов
+        - Таблицу позиций заказа
+        - Нижнюю панель с дополнительными функциями
+        - Подключает обработчики событий к элементам управления
+        """
         # Создание основного вертикального макета
         main_layout = QVBoxLayout()
 
@@ -68,7 +78,7 @@ class OrdersTab(QWidget):
         top_panel.addItem(spacer)
         top_panel.addWidget(self.search)
 
-        # Splitter for Orders and Order Items tables
+        # Разделитель для таблиц заказов и позиций заказа
         splitter = QSplitter(Qt.Orientation.Vertical)
 
         # Создание таблицы для отображения заказов
@@ -84,13 +94,13 @@ class OrdersTab(QWidget):
 
         self.orders_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.orders_table.customContextMenuRequested.connect(self.show_order_context_menu)
-        self.orders_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows) # Select whole rows
-        self.orders_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers) # Make read-only
+        self.orders_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows) # Выбор целых строк
+        self.orders_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers) # Только для чтения
         self.orders_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         splitter.addWidget(self.orders_table)
-        # Order Items Table
+        # Таблица позиций заказа
         self.order_items_table = QTableWidget()
-        # Columns for order_items table: order_item_id, product_id, quantity, unit_price, total_price
+        # Столбцы для таблицы позиций: order_item_id, product_id, quantity, unit_price, total_price
         self.order_items_table.setColumnCount(5)
         self.order_items_table.setHorizontalHeaderLabels(
             ["ID Позиции", "Товар", "Кол-во", "Цена за ед.", "Итого"]
@@ -99,7 +109,7 @@ class OrdersTab(QWidget):
         self.order_items_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         splitter.addWidget(self.order_items_table)
 
-        # Set initial sizes for splitter panes (optional)
+        # Установка начальных размеров для панелей разделителя
         splitter.setSizes([400, 200])
 
         # Создание нижней панели с дополнительными функциями
@@ -145,7 +155,6 @@ class OrdersTab(QWidget):
         main_layout.addWidget(splitter)
         main_layout.addLayout(bottom_panel)
 
-
         # Установка основного макета
         self.setLayout(main_layout)
 
@@ -162,7 +171,15 @@ class OrdersTab(QWidget):
         self.orders_table.itemSelectionChanged.connect(self.load_order_items)
 
     def load_orders(self):
-        """Загрузка заказов из базы данных и отображение в таблице"""
+        """
+        Загрузка заказов из базы данных и отображение в таблице.
+        
+        Выполняет SQL-запрос для получения списка заказов, 
+        форматирует данные и заполняет ими таблицу.
+        Обновляет счетчик общего количества заказов.
+        
+        :raises: Exception при ошибке загрузки данных
+        """
         try:
             # Очистка таблицы позиций при перезагрузке заказов
             self.order_items_table.setRowCount(0)
@@ -215,11 +232,27 @@ class OrdersTab(QWidget):
             QMessageBox.critical(self, "Ошибка", "Не удалось загрузить данные о заказах")
 
     def handle_search(self):
-        """Обработка изменений в поиске и фильтрах"""
+        """
+        Обработка изменений в поиске и фильтрах.
+        
+        Вызывается при вводе текста в поле поиска.
+        Запускает метод apply_filters для фильтрации таблицы заказов.
+        """
         self.apply_filters()
 
     def apply_filters(self):
-        """Применение фильтров к таблице заказов"""
+        """
+        Применение фильтров к таблице заказов.
+        
+        Фильтрует таблицу заказов на основе:
+        
+        - Текста из поля поиска (по ID заказа или названию поставщика)
+        - Выбранного статуса заказа из выпадающего списка
+        
+        Обновляет счетчик найденных заказов.
+        
+        :raises: Exception при ошибке фильтрации данных
+        """
         try:
             # Очистка таблицы позиций при фильтрации заказов
             self.order_items_table.setRowCount(0)
@@ -291,7 +324,15 @@ class OrdersTab(QWidget):
             logging.error(f"Ошибка фильтрации заказов: {str(e)}")
     
     def load_order_items(self):
-        """Загружает позиции для выбранного заказа в нижнюю таблицу."""
+        """
+        Загружает позиции для выбранного заказа в нижнюю таблицу.
+        
+        Вызывается при выборе заказа в верхней таблице.
+        Выполняет SQL-запрос для получения позиций выбранного заказа
+        и отображает их в нижней таблице.
+        
+        :raises: Exception при ошибке загрузки позиций заказа
+        """
         try:
             # Получение выбранных строк
             selected_rows = self.orders_table.selectionModel().selectedRows()
@@ -346,7 +387,20 @@ class OrdersTab(QWidget):
             self.order_items_table.setRowCount(0)
 
     def edit_order(self):
-        """Редактирование выбранного заказа"""
+        """
+        Редактирование выбранного заказа.
+        
+        Позволяет изменить данные существующего заказа, включая:
+        
+        - Поставщика
+        - Список товаров
+        - Количество и цены товаров
+        
+        Проверяет возможность редактирования заказа на основе его текущего статуса.
+        Завершенные и отмененные заказы редактировать нельзя.
+        
+        :raises: Exception при ошибке редактирования заказа
+        """
         # Получение выбранных строк
         selected_rows = self.orders_table.selectedItems()
         if not selected_rows:
@@ -477,7 +531,15 @@ class OrdersTab(QWidget):
             QMessageBox.critical(self, "Ошибка", f"Не удалось редактировать заказ: {str(e)}")
 
     def cancel_order(self):
-        """Отмена выбранного заказа"""
+        """
+        Отмена выбранного заказа.
+        
+        Изменяет статус заказа на "отменен" после подтверждения пользователем.
+        Проверяет возможность отмены заказа на основе его текущего статуса.
+        Завершенные и уже отмененные заказы отменить нельзя.
+        
+        :raises: Exception при ошибке отмены заказа
+        """
         # Получение выбранных строк
         selected_rows = self.orders_table.selectedItems()
         if not selected_rows:
@@ -529,7 +591,20 @@ class OrdersTab(QWidget):
                 QMessageBox.critical(self, "Ошибка", f"Не удалось отменить заказ: {str(e)}")
 
     def show_order_details(self):
-        """Отображение деталей выбранного заказа"""
+        """
+        Отображение деталей выбранного заказа.
+        
+        Показывает информацию о товарах в заказе:
+        
+        - Названия товаров
+        - Количество
+        - Цены за единицу
+        - Итоговые суммы
+        
+        Отображает общую сумму заказа.
+        
+        :raises: Exception при ошибке загрузки деталей заказа
+        """
         # Получение выбранных строк
         selected_rows = self.orders_table.selectedItems()
         if not selected_rows:
@@ -579,7 +654,19 @@ class OrdersTab(QWidget):
             QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить детали заказа: {str(e)}")
 
     def export_data(self):
-        """Экспорт данных о заказах"""
+        """
+        Экспорт данных о заказах.
+        
+        Позволяет экспортировать данные о заказах в различные форматы:
+        
+        - Excel
+        - CSV
+        - PDF
+        
+        Применяет текущие фильтры (статус, поиск) к экспортируемым данным.
+        
+        :raises: Exception при ошибке экспорта данных
+        """
         # Создание диалога экспорта
         dialog = ExportDialog(self, "Экспорт заказов")
         if dialog.exec():
@@ -672,37 +759,50 @@ class OrdersTab(QWidget):
                 QMessageBox.critical(self, "Ошибка", f"Ошибка при экспорте данных: {str(e)}")
 
     def create_purchase_order(self):
-         """Создает новый заказ поставщику через диалог."""
+         """
+         Создает новый заказ поставщику через диалог.
+         
+         Открывает диалог создания заказа, где пользователь может:
+         
+         - Выбрать поставщика
+         - Добавить товары
+         - Указать количество и цены
+         
+         При подтверждении создает новый заказ в базе данных.
+         Использует транзакцию для обеспечения целостности данных.
+         
+         :raises: Exception при ошибке создания заказа или транзакции
+         """
          try:
-             dialog = CreatePurchaseOrderDialog(self.db, self) # Pass db and parent
+             dialog = CreatePurchaseOrderDialog(self.db, self) # Передаем db и parent
              if dialog.exec() == QDialog.DialogCode.Accepted:
                  data = dialog.get_data()
                  if not data:
-                     # Dialog already showed specific error, just return
+                     # Диалог уже показал конкретную ошибку, просто возвращаемся
                      return
 
                  supplier_id = data['supplier_id']
                  items_data = data['items']
                  total_amount = data['total_amount']
 
-                 # Use transaction for order + items insertion
+                 # Используем транзакцию для добавления заказа и его позиций
                  order_id = None
                  try:
-                     # 1. Create order entry
+                     # 1. Создаем запись заказа
                      order_query = """
                          INSERT INTO orders (order_date, supplier_id, total_amount, status)
                          VALUES (CURRENT_DATE, %s, %s, 'в обработке')
                          RETURNING order_id
                      """
-                     # Use execute_query which handles commit/rollback on its own for single query
-                     # We need manual control here for transaction
+                     # Используем execute_query, который обрабатывает commit/rollback самостоятельно для одиночного запроса
+                     # Здесь нам нужен ручной контроль для транзакции
                      self.db.cursor.execute(order_query, (supplier_id, total_amount))
                      result = self.db.cursor.fetchone()
                      if not result:
                          raise Exception("Не удалось получить ID созданного заказа.")
                      order_id = result[0]
 
-                     # 2. Create order_items entries
+                     # 2. Создаем записи позиций заказа
                      item_query = """
                          INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price)
                          VALUES (%s, %s, %s, %s, %s)
@@ -711,16 +811,16 @@ class OrdersTab(QWidget):
                          (order_id, item['product_id'], item['quantity'], item['unit_price'], item['total_price'])
                          for item in items_data
                      ]
-                     # executemany doesn't return anything useful here
+                     # executemany не возвращает ничего полезного здесь
                      self.db.cursor.executemany(item_query, items_to_insert)
 
-                     # If all inserts succeeded, commit the transaction
+                     # Если все вставки успешны, фиксируем транзакцию
                      self.db.conn.commit()
-                     self.load_orders() # Refresh the orders list
+                     self.load_orders() # Обновляем список заказов
                      QMessageBox.information(self, "Успех", f"Заказ ID {order_id} успешно создан!")
 
                  except Exception as transaction_error:
-                     # Rollback transaction on any error during insert
+                     # Откатываем транзакцию при любой ошибке во время вставки
                      self.db.conn.rollback()
                      logging.error(f"Ошибка транзакции при создании заказа: {transaction_error}")
                      QMessageBox.critical(self, "Ошибка транзакции", f"Не удалось создать заказ (ID заказа={order_id}): {transaction_error}")
@@ -730,7 +830,19 @@ class OrdersTab(QWidget):
               QMessageBox.critical(self, "Ошибка", f"Ошибка при создании заказа: {dialog_error}")
 
     def view_order_details(self):
-        """Показывает детальную информацию о заказе в отдельном диалоге."""
+        """
+        Показывает детальную информацию о заказе в отдельном диалоге.
+        
+        Создает модальное окно с подробной информацией о заказе:
+        
+        - Основные данные (номер, дата, поставщик, статус)
+        - Таблица позиций заказа
+        - Метаданные (даты создания и обновления)
+        
+        Позволяет экспортировать детали заказа в PDF.
+        
+        :raises: Exception при ошибке загрузки или отображения данных
+        """
         try:
             selected_row = self.orders_table.currentRow()
             if selected_row == -1:
@@ -842,7 +954,20 @@ class OrdersTab(QWidget):
             QMessageBox.critical(self, "Ошибка", f"Не удалось отобразить детали заказа: {str(e)}")
 
     def export_order_details_to_pdf(self, order_id, order_details, order_items):
-        """Экспортирует детали заказа в PDF файл."""
+        """
+        Экспортирует детали заказа в PDF файл.
+        
+        Использует класс DataExporter для создания PDF-документа 
+        с детальной информацией о заказе.
+        
+        :param order_id: ID заказа
+        :type order_id: int
+        :param order_details: Основная информация о заказе (ID, дата, поставщик и т.д.)
+        :type order_details: tuple
+        :param order_items: Позиции заказа
+        :type order_items: list
+        :raises: Exception при ошибке экспорта
+        """
         try:
             # Импортируем необходимый класс для экспорта
             from data_export import DataExporter
@@ -858,10 +983,21 @@ class OrdersTab(QWidget):
             QMessageBox.critical(self, "Ошибка", f"Не удалось экспортировать детали заказа: {str(e)}")
 
     def show_order_context_menu(self, position):
-        """Показывает контекстное меню для строки заказа."""
+        """
+        Показывает контекстное меню для строки заказа.
+        
+        Вызывается при правом клике на строке в таблице заказов.
+        Содержит пункты:
+        
+        - Изменить статус
+        - Просмотр деталей
+        
+        :param position: Позиция курсора для отображения меню
+        :type position: QPoint
+        """
         selected_rows = self.orders_table.selectionModel().selectedRows()
         if not selected_rows:
-            return # Don't show menu if no row selected
+            return # Не показываем меню, если строка не выбрана
 
         try:
             menu = QMenu()
@@ -877,14 +1013,27 @@ class OrdersTab(QWidget):
             logging.error(f"Ошибка контекстного меню заказа: {str(e)}")
 
     def change_order_status(self):
-        """Изменяет статус выбранного заказа."""
+        """
+        Изменяет статус выбранного заказа.
+        
+        Позволяет изменить статус заказа на один из доступных:
+        
+        - в обработке
+        - доставлен
+        - отменен
+        
+        При изменении статуса на "доставлен" обновляет остатки на складе 
+        с помощью триггера базы данных.
+        
+        :raises: Exception при ошибке изменения статуса
+        """
         try:
             selected_row = self.orders_table.currentRow()
             if selected_row == -1:
                 QMessageBox.warning(self, "Внимание", "Выберите заказ для изменения статуса.")
                 return
 
-            # Get order ID and current status
+            # Получаем ID заказа и текущий статус
             order_id_item = self.orders_table.item(selected_row, 0)
             current_status_item = self.orders_table.item(selected_row, 4)
 
@@ -898,12 +1047,12 @@ class OrdersTab(QWidget):
             # Логируем полученные данные
             logging.debug(f"Изменение статуса заказа ID: {order_id}, текущий статус: {current_status}")
 
-            # Get list of valid statuses from database (or hardcode them)
+            # Получаем список доступных статусов (можно получить из БД или задать жестко)
             valid_statuses = ['в обработке', 'доставлен', 'отменен']
-            # Remove current status from options
+            # Удаляем текущий статус из опций
             valid_statuses.remove(current_status)
 
-            # Simple QInputDialog to select new status (can replace with custom dialog)
+            # Простой QInputDialog для выбора нового статуса (можно заменить на собственный диалог)
             new_status, ok = QInputDialog.getItem(
                 self, "Изменить статус", f"Выберите новый статус для заказа #{order_id}:",
                 valid_statuses, 0, False
@@ -945,7 +1094,7 @@ class OrdersTab(QWidget):
                     
                     # Стандартное обновление статуса
                     if self.db.execute_query(query, (new_status, order_id), self):
-                        self.load_orders() # Reload orders to reflect change
+                        self.load_orders() # Перезагружаем данные для отображения изменений
                         QMessageBox.information(self, "Успех", f"Статус заказа ID {order_id} обновлен на '{new_status}'!")
                     else:
                         QMessageBox.critical(self, "Ошибка", f"Ошибка обновления статуса заказа ID {order_id}")

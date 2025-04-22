@@ -25,14 +25,18 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 class DataExporter:
-    """Класс для экспорта данных из приложения в различные форматы"""
+    """
+    Класс для экспорта данных из приложения в различные форматы.
+    
+    Поддерживает экспорт данных в форматы CSV, Excel и PDF.
+    """
     
     def __init__(self, parent_widget=None):
         """
-        Инициализация экспортера данных
+        Инициализация экспортера данных.
         
-        Args:
-            parent_widget: Родительский виджет для диалогов
+        :param parent_widget: Родительский виджет для отображения диалоговых окон
+        :type parent_widget: QWidget или None
         """
         # Создание объекта базы данных
         self.db = Database()
@@ -41,16 +45,19 @@ class DataExporter:
     
     def export_to_csv(self, query, params=None, filename=None, headers=None):
         """
-        Экспорт данных в CSV файл
+        Экспорт данных в CSV файл.
         
-        Args:
-            query: SQL запрос для получения данных
-            params: Параметры запроса
-            filename: Имя файла для экспорта (если None, будет показан диалог)
-            headers: Заголовки столбцов (если None, будут использованы имена полей)
-            
-        Returns:
-            bool: Успешность экспорта
+        :param query: SQL запрос для получения данных
+        :type query: str
+        :param params: Параметры запроса
+        :type params: tuple или None
+        :param filename: Имя файла для экспорта (если None, будет показан диалог)
+        :type filename: str или None
+        :param headers: Заголовки столбцов (если None, будут использованы имена полей)
+        :type headers: list или None
+        
+        :returns: Успешность экспорта
+        :rtype: bool
         """
         try:
             # Получение данных из базы данных
@@ -107,17 +114,21 @@ class DataExporter:
     
     def export_to_excel(self, query, params=None, filename=None, sheet_name="Data", headers=None):
         """
-        Экспорт данных в Excel файл
+        Экспорт данных в Excel файл.
         
-        Args:
-            query: SQL запрос для получения данных
-            params: Параметры запроса
-            filename: Имя файла для экспорта (если None, будет показан диалог)
-            sheet_name: Имя листа в Excel файле
-            headers: Заголовки столбцов (если None, будут использованы имена полей)
-            
-        Returns:
-            bool: Успешность экспорта
+        :param query: SQL запрос для получения данных
+        :type query: str
+        :param params: Параметры запроса
+        :type params: tuple или None
+        :param filename: Имя файла для экспорта (если None, будет показан диалог)
+        :type filename: str или None
+        :param sheet_name: Имя листа в Excel файле
+        :type sheet_name: str
+        :param headers: Заголовки столбцов (если None, будут использованы имена полей)
+        :type headers: list или None
+        
+        :returns: Успешность экспорта
+        :rtype: bool
         """
         try:
             # Получение данных из базы данных
@@ -171,17 +182,21 @@ class DataExporter:
 
     def export_to_pdf(self, query, params=None, filename=None, headers=None, title="Отчет"):
         """
-        Экспорт данных в PDF файл
+        Экспорт данных в PDF файл.
         
-        Args:
-            query: SQL запрос для получения данных
-            params: Параметры запроса
-            filename: Имя файла для экспорта (если None, будет показан диалог)
-            headers: Заголовки столбцов (если None, будут использованы имена полей)
-            title: Заголовок документа
-            
-        Returns:
-            bool: Успешность экспорта
+        :param query: SQL запрос для получения данных
+        :type query: str
+        :param params: Параметры запроса
+        :type params: tuple или None
+        :param filename: Имя файла для экспорта (если None, будет показан диалог)
+        :type filename: str или None
+        :param headers: Заголовки столбцов (если None, будут использованы имена полей)
+        :type headers: list или None
+        :param title: Заголовок документа
+        :type title: str
+        
+        :returns: Успешность экспорта
+        :rtype: bool
         """
         try:
             # Получение данных из базы данных
@@ -274,6 +289,17 @@ class DataExporter:
             
             # Функция форматирования текста для ячеек
             def format_text(text, is_header=False):
+                """
+                Форматирование текста для ячеек таблицы.
+                
+                :param text: Текст для форматирования
+                :type text: str
+                :param is_header: Является ли текст заголовком
+                :type is_header: bool
+                
+                :returns: Отформатированный параграф
+                :rtype: Paragraph
+                """
                 if is_header:
                     return Paragraph(f"<b>{text}</b>", cell_style)
                 # Для обычного текста - просто создаем Paragraph для автопереноса
@@ -369,16 +395,19 @@ class DataExporter:
 
     def export_order_details_to_pdf(self, order_id, order_details, order_items, filename=None):
         """
-        Экспорт деталей заказа в PDF файл
+        Экспорт деталей заказа в PDF файл.
         
-        Args:
-            order_id: Идентификатор заказа
-            order_details: Детали заказа (кортеж с информацией о заказе)
-            order_items: Позиции заказа (список кортежей с позициями заказа)
-            filename: Имя файла для экспорта (если None, будет показан диалог)
-            
-        Returns:
-            bool: Успешность экспорта
+        :param order_id: Идентификатор заказа
+        :type order_id: int
+        :param order_details: Детали заказа (кортеж с информацией о заказе)
+        :type order_details: tuple
+        :param order_items: Позиции заказа (список кортежей с позициями заказа)
+        :type order_items: list[tuple]
+        :param filename: Имя файла для экспорта (если None, будет показан диалог)
+        :type filename: str или None
+        
+        :returns: Успешность экспорта
+        :rtype: bool
         """
         try:
             # Если имя файла не указано, запрашиваем его через диалог
@@ -517,14 +546,18 @@ class DataExporter:
 
 
 class DataImporter:
-    """Класс для импорта данных в приложение из различных форматов"""
+    """
+    Класс для импорта данных в приложение из различных форматов.
+    
+    Поддерживает импорт данных из форматов CSV и Excel в различные таблицы базы данных.
+    """
     
     def __init__(self, parent_widget=None):
         """
-        Инициализация импортера данных
+        Инициализация импортера данных.
         
-        Args:
-            parent_widget: Родительский виджет для диалогов
+        :param parent_widget: Родительский виджет для отображения диалоговых окон
+        :type parent_widget: QWidget или None
         """
         # Создание объекта базы данных
         self.db = Database()
@@ -533,15 +566,17 @@ class DataImporter:
     
     def import_from_csv(self, table_name, filename=None, delimiter=','):
         """
-        Импорт данных из CSV файла
+        Импорт данных из CSV файла.
         
-        Args:
-            table_name: Имя таблицы для импорта
-            filename: Имя файла для импорта (если None, будет показан диалог)
-            delimiter: Разделитель в CSV файле
-            
-        Returns:
-            bool: Успешность импорта
+        :param table_name: Имя таблицы для импорта
+        :type table_name: str
+        :param filename: Имя файла для импорта (если None, будет показан диалог)
+        :type filename: str или None
+        :param delimiter: Разделитель в CSV файле
+        :type delimiter: str
+        
+        :returns: Успешность импорта
+        :rtype: bool
         """
         try:
             # Если имя файла не указано, запрашиваем его через диалог
@@ -604,15 +639,17 @@ class DataImporter:
     
     def import_from_excel(self, table_name, filename=None, sheet_name=0):
         """
-        Импорт данных из Excel файла
+        Импорт данных из Excel файла.
         
-        Args:
-            table_name: Имя таблицы для импорта
-            filename: Имя файла для импорта (если None, будет показан диалог)
-            sheet_name: Имя или индекс листа в Excel файле
-            
-        Returns:
-            bool: Успешность импорта
+        :param table_name: Имя таблицы для импорта
+        :type table_name: str
+        :param filename: Имя файла для импорта (если None, будет показан диалог)
+        :type filename: str или None
+        :param sheet_name: Имя или индекс листа в Excel файле
+        :type sheet_name: str или int
+        
+        :returns: Успешность импорта
+        :rtype: bool
         """
         try:
             # Если имя файла не указано, запрашиваем его через диалог

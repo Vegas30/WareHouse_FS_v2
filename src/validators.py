@@ -1,3 +1,12 @@
+"""
+Модуль валидации и санитизации входных данных.
+
+Этот модуль предоставляет класс Validator для проверки корректности
+и обработки входных данных в приложении.
+
+:author: Игорь Валуйсков
+:version: 1.0
+"""
 # Импорт модуля для работы с регулярными выражениями
 import re
 # Импорт типов для аннотаций
@@ -6,19 +15,28 @@ from typing import Union, Tuple, Any, Dict
 import html
 
 class Validator:
-    """Класс для валидации и санитизации входных данных"""
+    """
+    Класс для валидации и санитизации входных данных.
+    
+    Предоставляет статические методы для проверки корректности текста,
+    email-адресов, телефонных номеров, числовых значений, а также 
+    методы для санитизации входных данных.
+    """
     
     @staticmethod
     def validate_text(text: str, min_length: int = 1, max_length: int = 255) -> Tuple[bool, str]:
-        """Валидация текстовых полей
+        """
+        Валидация текстовых полей.
         
-        Args:
-            text: Текст для проверки
-            min_length: Минимальная длина
-            max_length: Максимальная длина
+        :param text: Текст для проверки
+        :type text: str
+        :param min_length: Минимальная длина
+        :type min_length: int
+        :param max_length: Максимальная длина
+        :type max_length: int
             
-        Returns:
-            Tuple[bool, str]: (Прошла ли проверка, сообщение об ошибке)
+        :returns: Кортеж (успех, сообщение об ошибке)
+        :rtype: tuple[bool, str]
         """
         # Проверка на пустое значение
         if not text:
@@ -33,13 +51,14 @@ class Validator:
     
     @staticmethod
     def validate_email(email: str) -> Tuple[bool, str]:
-        """Валидация email адреса
+        """
+        Валидация email адреса.
         
-        Args:
-            email: Email для проверки
+        :param email: Email для проверки
+        :type email: str
             
-        Returns:
-            Tuple[bool, str]: (Прошла ли проверка, сообщение об ошибке)
+        :returns: Кортеж (успех, сообщение об ошибке)
+        :rtype: tuple[bool, str]
         """
         # Проверка на пустое значение
         if not email:
@@ -54,13 +73,14 @@ class Validator:
     
     @staticmethod
     def validate_phone(phone: str) -> Tuple[bool, str]:
-        """Валидация телефонного номера
+        """
+        Валидация телефонного номера.
         
-        Args:
-            phone: Номер телефона для проверки
+        :param phone: Номер телефона для проверки
+        :type phone: str
             
-        Returns:
-            Tuple[bool, str]: (Прошла ли проверка, сообщение об ошибке)
+        :returns: Кортеж (успех, сообщение об ошибке)
+        :rtype: tuple[bool, str]
         """
         # Проверка на пустое значение
         if not phone:
@@ -78,15 +98,18 @@ class Validator:
     def validate_number(value: Union[str, int, float], 
                         min_value: float = None, 
                         max_value: float = None) -> Tuple[bool, str]:
-        """Валидация числовых значений
+        """
+        Валидация числовых значений.
         
-        Args:
-            value: Значение для проверки
-            min_value: Минимальное допустимое значение
-            max_value: Максимальное допустимое значение
+        :param value: Значение для проверки
+        :type value: Union[str, int, float]
+        :param min_value: Минимальное допустимое значение
+        :type min_value: float или None
+        :param max_value: Максимальное допустимое значение
+        :type max_value: float или None
             
-        Returns:
-            Tuple[bool, str]: (Прошла ли проверка, сообщение об ошибке)
+        :returns: Кортеж (успех, сообщение об ошибке)
+        :rtype: tuple[bool, str]
         """
         try:
             # Преобразование значения в число
@@ -107,13 +130,14 @@ class Validator:
     
     @staticmethod
     def sanitize_input(value: str) -> str:
-        """Санитизация входных данных для защиты от инъекций
+        """
+        Санитизация входных данных для защиты от инъекций.
         
-        Args:
-            value: Значение для санитизации
+        :param value: Значение для санитизации
+        :type value: str
             
-        Returns:
-            str: Безопасное значение
+        :returns: Безопасное значение
+        :rtype: str
         """
         # Проверка типа входных данных
         if not isinstance(value, str):
@@ -129,13 +153,14 @@ class Validator:
     
     @staticmethod
     def sanitize_dict(data: Dict[str, Any]) -> Dict[str, Any]:
-        """Санитизация словаря с данными
+        """
+        Санитизация словаря с данными.
         
-        Args:
-            data: Словарь для санитизации
+        :param data: Словарь для санитизации
+        :type data: Dict[str, Any]
             
-        Returns:
-            Dict[str, Any]: Словарь с безопасными значениями
+        :returns: Словарь с безопасными значениями
+        :rtype: Dict[str, Any]
         """
         # Создание нового словаря для безопасных значений
         result = {}

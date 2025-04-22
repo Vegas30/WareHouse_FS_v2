@@ -1,3 +1,12 @@
+"""
+Модуль для работы с базой данных PostgreSQL.
+
+Этот модуль предоставляет класс Database для подключения к базе данных PostgreSQL
+и выполнения запросов к ней в контексте приложения для управления складом.
+
+:author: Игорь Валуйсков
+:version: 1.0
+"""
 # Импорт модуля для работы с PostgreSQL
 import psycopg2
 # Импорт модуля для логирования
@@ -6,10 +15,22 @@ import logging
 from PyQt6.QtWidgets import QMessageBox
 
 class Database:
-    """Класс для работы с базой данных PostgreSQL"""
+    """
+    Класс для работы с базой данных PostgreSQL.
+    
+    Обеспечивает соединение с базой данных и предоставляет методы
+    для выполнения запросов и получения результатов.
+    """
     
     def __init__(self):
-        """Инициализация соединения с базой данных"""
+        """
+        Инициализация соединения с базой данных.
+        
+        Создает соединение с базой данных PostgreSQL используя
+        заданные параметры подключения.
+        
+        :raises: Exception при ошибке подключения к базе данных
+        """
         try:
             # Установка соединения с базой данных PostgreSQL
             self.conn = psycopg2.connect(
@@ -30,15 +51,17 @@ class Database:
 
     def execute_query(self, query, params=None, parent_widget=None):
         """
-        Выполнение SQL-запроса
+        Выполнение SQL-запроса.
         
-        Args:
-            query: SQL-запрос
-            params: Параметры запроса
-            parent_widget: Родительский виджет для отображения ошибок
+        :param query: SQL-запрос для выполнения
+        :type query: str
+        :param params: Параметры запроса
+        :type params: tuple или None
+        :param parent_widget: Родительский виджет для отображения ошибок
+        :type parent_widget: QWidget или None
             
-        Returns:
-            bool: Успешность выполнения запроса
+        :returns: Результат успешности выполнения запроса
+        :rtype: bool
         """
         try:
             # Выполнение SQL-запроса с параметрами
@@ -65,15 +88,17 @@ class Database:
             
     def fetch_all(self, query, params=None, parent_widget=None):
         """
-        Получение всех результатов SQL-запроса
+        Получение всех результатов SQL-запроса.
         
-        Args:
-            query: SQL-запрос
-            params: Параметры запроса
-            parent_widget: Родительский виджет для отображения ошибок
+        :param query: SQL-запрос для выполнения
+        :type query: str
+        :param params: Параметры запроса
+        :type params: tuple или None
+        :param parent_widget: Родительский виджет для отображения ошибок
+        :type parent_widget: QWidget или None
             
-        Returns:
-            list: Результаты запроса или пустой список в случае ошибки
+        :returns: Список результатов запроса или пустой список в случае ошибки
+        :rtype: list
         """
         try:
             # Выполнение SQL-запроса с параметрами
@@ -97,15 +122,17 @@ class Database:
             
     def fetch_one(self, query, params=None, parent_widget=None):
         """
-        Получение одного результата SQL-запроса
+        Получение одного результата SQL-запроса.
         
-        Args:
-            query: SQL-запрос
-            params: Параметры запроса
-            parent_widget: Родительский виджет для отображения ошибок
+        :param query: SQL-запрос для выполнения
+        :type query: str
+        :param params: Параметры запроса
+        :type params: tuple или None
+        :param parent_widget: Родительский виджет для отображения ошибок
+        :type parent_widget: QWidget или None
             
-        Returns:
-            tuple: Результат запроса или None в случае ошибки
+        :returns: Результат запроса или None в случае ошибки
+        :rtype: tuple или None
         """
         try:
             # Выполнение SQL-запроса с параметрами
@@ -128,7 +155,13 @@ class Database:
             return None 
 
     def close(self):
-        """Закрытие соединения с базой данных"""
+        """
+        Закрытие соединения с базой данных.
+        
+        Закрывает курсор и соединение с базой данных, освобождая ресурсы.
+        
+        :returns: None
+        """
         # Проверка наличия активного соединения
         if self.conn:
             # Закрытие курсора
