@@ -29,13 +29,19 @@
 - `src/visualization.py` - модуль визуализации
 - `src/validators.py` - валидаторы форм ввода
 - `src/styles.py` - стили интерфейса
-- `src/tabs/` - отдельные вкладки интерфейса
+- `src/build_app.py` - скрипт для сборки приложения
+- `src/tabs/` - отдельные вкладки интерфейса:
+  - `src/tabs/stock_tab.py` - вкладка управления запасами
+  - `src/tabs/warehouses_tab.py` - вкладка управления складами
+  - `src/tabs/products_tab.py` - вкладка управления товарами
+  - `src/tabs/orders_tab.py` - вкладка управления заказами
+  - `src/tabs/suppliers_tab.py` - вкладка управления поставщиками
 
 ## Установка и запуск
 
 1. Клонировать репозиторий
 ```
-git clone https://github.com/yourusername/WareHouse_FS_v2.git
+git clone https://github.com/Vegas30/WareHouse_FS_v2.git
 cd WareHouse_FS_v2
 ```
 
