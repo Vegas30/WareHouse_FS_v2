@@ -5,7 +5,7 @@ import pandas as pd
 # Импорт библиотеки для работы с массивами и математическими операциями
 import numpy as np
 # Импорт необходимых компонентов из PyQt6 для создания графического интерфейса
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QWidget, QLabel, QPushButton, QComboBox, QDateEdit
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QWidget, QLabel, QPushButton, QComboBox, QHBoxLayout, QFileDialog
 # Импорт компонентов для работы со шрифтами
 from PyQt6.QtGui import QFont
 # Импорт базовых компонентов Qt
@@ -44,6 +44,11 @@ class ChartWidget(QWidget):
         # Добавление холста в layout
         self.layout.addWidget(self.canvas)
         
+        # Добавление кнопки для сохранения графика
+        self.save_button = QPushButton("Сохранить график")
+        self.save_button.clicked.connect(self.save_chart)
+        self.layout.addWidget(self.save_button)
+        
         # Очистка графика при инициализации
         self.clear_plot()
     
@@ -55,6 +60,33 @@ class ChartWidget(QWidget):
         self.axes = self.figure.add_subplot(111)
         # Обновление холста для отображения изменений
         self.canvas.draw()
+    
+    def save_chart(self):
+        """Сохранение текущего графика в файл"""
+        try:
+            # Определение поддерживаемых форматов изображений
+            file_formats = "Изображения (*.png *.jpg *.jpeg *.pdf *.svg)"
+            
+            # Открытие диалога выбора пути для сохранения файла
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Сохранить график",
+                "",
+                file_formats
+            )
+            
+            # Проверка, был ли выбран путь
+            if file_path:
+                # Сохранение текущей фигуры по указанному пути
+                self.figure.savefig(
+                    file_path,
+                    dpi=300,  # Высокое разрешение для печати
+                    bbox_inches='tight'  # Обрезка лишних отступов
+                )
+                logging.info(f"График успешно сохранен в {file_path}")
+        except Exception as e:
+            # Логирование ошибки при сохранении графика
+            logging.error(f"Ошибка при сохранении графика: {str(e)}")
     
     def plot_bar_chart(self, x_data, y_data, title="", x_label="", y_label=""):
         """
@@ -169,8 +201,13 @@ class InventoryAnalysisDialog(QDialog):
         # Создание вертикального layout для диалога
         self.layout = QVBoxLayout(self)
         
+        # Создание виджета для графиков
+        self.chart_widget = ChartWidget(self)
+        # Добавление виджета графиков в layout
+        self.layout.addWidget(self.chart_widget)
+        
         # Создание и настройка заголовка
-        self.title_label = QLabel("Анализ и прогнозирование запасов")
+        self.title_label = QLabel("Анализ запасов")
         # Установка шрифта для заголовка
         self.title_label.setFont(QFont("Arial", 14, QFont.Weight.Bold))
         # Выравнивание заголовка по центру
@@ -178,22 +215,14 @@ class InventoryAnalysisDialog(QDialog):
         # Добавление заголовка в layout
         self.layout.addWidget(self.title_label)
         
-        # Настройка панели фильтров
-        self.setup_filters()
-        
-        # Создание виджета для графиков
-        self.chart_widget = ChartWidget(self)
-        # Добавление виджета графиков в layout
-        self.layout.addWidget(self.chart_widget)
-        
-        # Настройка кнопок анализа
-        self.setup_buttons()
+        # Настройка фильтров и кнопок анализа
+        self.setup_filters_and_buttons()
         
         # Загрузка данных по умолчанию
         self.update_stock_by_category()
     
-    def setup_filters(self):
-        """Настройка панели фильтров"""
+    def setup_filters_and_buttons(self):
+        """Настройка панели фильтров и кнопок анализа"""
         # Создание выпадающего списка для категорий
         self.category_combo = QComboBox(self)
         # Добавление пункта "Все категории"
@@ -228,59 +257,28 @@ class InventoryAnalysisDialog(QDialog):
             # Логирование ошибки при загрузке складов
             logging.error(f"Error loading warehouses: {str(e)}")
         
-        # Создание виджетов для выбора дат
-        self.start_date = QDateEdit(self)
-        # Установка начальной даты (месяц назад)
-        self.start_date.setDate(QDate.currentDate().addMonths(-1))
-        # Включение всплывающего календаря
-        self.start_date.setCalendarPopup(True)
-        
-        self.end_date = QDateEdit(self)
-        # Установка конечной даты (текущая дата)
-        self.end_date.setDate(QDate.currentDate())
-        # Включение всплывающего календаря
-        self.end_date.setCalendarPopup(True)
-        
-        # Создание layout для фильтров
-        filters_layout = QVBoxLayout()
-        # Добавление элементов управления фильтрами
-        filters_layout.addWidget(QLabel("Категория:"))
-        filters_layout.addWidget(self.category_combo)
-        filters_layout.addWidget(QLabel("Склад:"))
-        filters_layout.addWidget(self.warehouse_combo)
-        filters_layout.addWidget(QLabel("Период с:"))
-        filters_layout.addWidget(self.start_date)
-        filters_layout.addWidget(QLabel("по:"))
-        filters_layout.addWidget(self.end_date)
-        
-        # Добавление layout с фильтрами в основной layout
-        self.layout.addLayout(filters_layout)
-    
-    def setup_buttons(self):
-        """Настройка кнопок анализа"""
-        # Создание layout для кнопок
-        buttons_layout = QVBoxLayout()
-        
-        # Создание и настройка кнопок для различных видов анализа
+        # Создание кнопок для различных видов анализа
         self.stock_by_category_btn = QPushButton("Запасы по категориям")
         # Подключение обработчика нажатия кнопки
         self.stock_by_category_btn.clicked.connect(self.update_stock_by_category)
-        buttons_layout.addWidget(self.stock_by_category_btn)
         
         self.stock_by_warehouse_btn = QPushButton("Запасы по складам")
         self.stock_by_warehouse_btn.clicked.connect(self.update_stock_by_warehouse)
-        buttons_layout.addWidget(self.stock_by_warehouse_btn)
         
-        self.low_stock_btn = QPushButton("Товары с низким запасом")
-        self.low_stock_btn.clicked.connect(self.show_low_stock_items)
-        buttons_layout.addWidget(self.low_stock_btn)
+        # Создание горизонтальных layout для фильтров и кнопок
+        category_layout = QHBoxLayout()
+        category_layout.addWidget(QLabel("Склад:"))
+        category_layout.addWidget(self.warehouse_combo)
+        category_layout.addWidget(self.stock_by_category_btn)
         
-        self.stock_forecast_btn = QPushButton("Прогноз запасов")
-        self.stock_forecast_btn.clicked.connect(self.show_stock_forecast)
-        buttons_layout.addWidget(self.stock_forecast_btn)
+        warehouse_layout = QHBoxLayout()
+        warehouse_layout.addWidget(QLabel("Категория:"))
+        warehouse_layout.addWidget(self.category_combo)
+        warehouse_layout.addWidget(self.stock_by_warehouse_btn)
         
-        # Добавление layout с кнопками в основной layout
-        self.layout.addLayout(buttons_layout)
+        # Добавление layout с фильтрами и кнопками в основной layout
+        self.layout.addLayout(category_layout)
+        self.layout.addLayout(warehouse_layout)
     
     def update_stock_by_category(self):
         """Обновление графика запасов по категориям"""
@@ -365,179 +363,21 @@ class InventoryAnalysisDialog(QDialog):
             warehouses = [row[0] for row in result]
             quantities = [row[1] for row in result]
             
-            # Построение круговой диаграммы
-            self.chart_widget.plot_pie_chart(
-                quantities, 
+            # Построение столбчатой диаграммы вместо круговой
+            self.chart_widget.plot_bar_chart(
                 warehouses, 
-                "Распределение запасов по складам"
+                quantities, 
+                "Распределение запасов по складам", 
+                "Склад", 
+                "Количество"
             )
         except Exception as e:
             # Логирование ошибки при обновлении графика
             logging.error(f"Error updating stock by warehouse: {str(e)}")
-    
-    def show_low_stock_items(self):
-        """Отображение товаров с низким уровнем запасов"""
-        try:
-            # Установка порога для низкого уровня запасов
-            low_stock_threshold = 20
-            
-            # Инициализация фильтров
-            warehouse_filter = ""
-            category_filter = ""
-            params = [low_stock_threshold]
-            
-            # Проверка выбора конкретного склада
-            if self.warehouse_combo.currentIndex() > 0:
-                warehouse_id = self.warehouse_combo.currentData()
-                warehouse_filter = "AND s.warehouse_id = %s"
-                params.append(warehouse_id)
-            
-            # Проверка выбора конкретной категории
-            if self.category_combo.currentIndex() > 0:
-                category = self.category_combo.currentText()
-                category_filter = "AND p.category = %s"
-                params.append(category)
-            
-            # SQL-запрос для получения товаров с низким уровнем запасов
-            query = f"""
-                SELECT p.product_name, SUM(s.quantity) as total_stock
-                FROM products p
-                JOIN stock s ON p.product_id = s.product_id
-                WHERE s.quantity < %s {warehouse_filter} {category_filter}
-                GROUP BY p.product_name
-                ORDER BY total_stock
-            """
-            
-            # Выполнение запроса
-            result = self.db.fetch_all(query, params, self)
-            
-            # Проверка наличия результатов
-            if not result:
-                self.chart_widget.clear_plot()
-                return
-            
-            # Извлечение данных для графика
-            products = [row[0] for row in result]
-            quantities = [row[1] for row in result]
-            
-            # Построение столбчатой диаграммы
-            self.chart_widget.plot_bar_chart(
-                products, 
-                quantities, 
-                "Товары с низким уровнем запасов", 
-                "Товар", 
-                "Количество"
-            )
-        except Exception as e:
-            # Логирование ошибки при отображении товаров с низким запасом
-            logging.error(f"Error showing low stock items: {str(e)}")
-    
-    def show_stock_forecast(self):
-        """Отображение прогноза запасов на основе исторических данных"""
-        try:
-            # Получение выбранного периода
-            start_date = self.start_date.date().toString("yyyy-MM-dd")
-            end_date = self.end_date.date().toString("yyyy-MM-dd")
-            
-            # Инициализация фильтров
-            warehouse_filter = ""
-            category_filter = ""
-            params = [start_date, end_date]
-            
-            # Проверка выбора конкретного склада
-            if self.warehouse_combo.currentIndex() > 0:
-                warehouse_id = self.warehouse_combo.currentData()
-                warehouse_filter = "AND s.warehouse_id = %s"
-                params.append(warehouse_id)
-            
-            # Проверка выбора конкретной категории
-            if self.category_combo.currentIndex() > 0:
-                category = self.category_combo.currentText()
-                category_filter = "AND p.category = %s"
-                params.append(category)
-            
-            # SQL-запрос для получения текущих запасов
-            current_stock_query = f"""
-                SELECT p.category, SUM(s.quantity) as total_stock
-                FROM products p
-                JOIN stock s ON p.product_id = s.product_id
-                WHERE 1=1 {warehouse_filter} {category_filter}
-                GROUP BY p.category
-                ORDER BY p.category
-            """
-            
-            # SQL-запрос для получения данных о потреблении товаров
-            consumption_query = f"""
-                SELECT p.category, SUM(oi.quantity) as total_ordered
-                FROM products p
-                JOIN order_items oi ON p.product_id = oi.product_id
-                JOIN orders o ON oi.order_id = o.order_id
-                JOIN stock s ON p.product_id = s.product_id
-                WHERE o.order_date BETWEEN %s AND %s {warehouse_filter} {category_filter}
-                GROUP BY p.category
-                ORDER BY p.category
-            """
-            
-            # Выполнение запросов
-            current_stock = self.db.fetch_all(current_stock_query, params[2:], self)
-            consumption = self.db.fetch_all(consumption_query, params, self)
-            
-            # Проверка наличия результатов
-            if not current_stock or not consumption:
-                self.chart_widget.clear_plot()
-                return
-            
-            # Подготовка данных для графика
-            categories = []
-            current_values = []
-            forecast_values = []
-            
-            # Создание словаря с данными о потреблении
-            consumption_dict = {row[0]: row[1] for row in consumption}
-            
-            # Расчет прогноза для каждой категории
-            for category, stock in current_stock:
-                categories.append(category)
-                current_values.append(stock)
-                
-                # Получение потребления за период
-                consumption_rate = consumption_dict.get(category, 0)
-                
-                # Расчет прогноза на следующий месяц
-                forecast = max(0, stock - consumption_rate)
-                forecast_values.append(forecast)
-            
-            # Очистка текущего графика
-            self.chart_widget.clear_plot()
-            
-            # Подготовка данных для столбчатой диаграммы
-            x = np.arange(len(categories))
-            width = 0.35
-            
-            # Построение столбчатой диаграммы с текущими и прогнозируемыми запасами
-            self.chart_widget.axes.bar(x - width/2, current_values, width, label='Текущий запас')
-            self.chart_widget.axes.bar(x + width/2, forecast_values, width, label='Прогноз через месяц')
-            
-            # Настройка отображения графика
-            self.chart_widget.axes.set_title('Прогноз запасов по категориям')
-            self.chart_widget.axes.set_xlabel('Категория')
-            self.chart_widget.axes.set_ylabel('Количество')
-            self.chart_widget.axes.set_xticks(x)
-            self.chart_widget.axes.set_xticklabels(categories)
-            plt.setp(self.chart_widget.axes.get_xticklabels(), rotation=45, ha='right')
-            self.chart_widget.axes.legend()
-            
-            # Оптимизация расположения элементов графика
-            self.chart_widget.figure.tight_layout()
-            # Обновление холста
-            self.chart_widget.canvas.draw()
-        except Exception as e:
-            # Логирование ошибки при отображении прогноза
-            logging.error(f"Error showing stock forecast: {str(e)}")
 
 
-class SalesReportDialog(QDialog):
-    """Диалог для отображения отчетов по продажам"""
+class OrdersReportDialog(QDialog):
+    """Диалог для отображения отчетов по заказам"""
     
     def __init__(self, parent=None):
         # Инициализация родительского класса
@@ -545,7 +385,7 @@ class SalesReportDialog(QDialog):
         # Создание экземпляра базы данных
         self.db = Database()
         # Установка заголовка окна
-        self.setWindowTitle("Отчеты по продажам")
+        self.setWindowTitle("Отчеты по заказам")
         # Установка размеров окна
         self.resize(900, 700)
         # Настройка пользовательского интерфейса
@@ -556,8 +396,13 @@ class SalesReportDialog(QDialog):
         # Создание вертикального layout для диалога
         self.layout = QVBoxLayout(self)
         
+        # Создание виджета для графиков
+        self.chart_widget = ChartWidget(self)
+        # Добавление виджета графиков в layout
+        self.layout.addWidget(self.chart_widget)
+        
         # Создание и настройка заголовка
-        self.title_label = QLabel("Отчеты по продажам и поставкам")
+        self.title_label = QLabel("Отчеты по заказам и поставкам")
         # Установка шрифта для заголовка
         self.title_label.setFont(QFont("Arial", 14, QFont.Weight.Bold))
         # Выравнивание заголовка по центру
@@ -565,45 +410,11 @@ class SalesReportDialog(QDialog):
         # Добавление заголовка в layout
         self.layout.addWidget(self.title_label)
         
-        # Настройка панели фильтров
-        self.setup_filters()
-        
-        # Создание виджета для графиков
-        self.chart_widget = ChartWidget(self)
-        # Добавление виджета графиков в layout
-        self.layout.addWidget(self.chart_widget)
-        
         # Настройка кнопок отчетов
         self.setup_buttons()
         
         # Загрузка данных по умолчанию
         self.show_sales_by_category()
-    
-    def setup_filters(self):
-        """Настройка панели фильтров"""
-        # Создание виджетов для выбора дат
-        self.start_date = QDateEdit(self)
-        # Установка начальной даты (три месяца назад)
-        self.start_date.setDate(QDate.currentDate().addMonths(-3))
-        # Включение всплывающего календаря
-        self.start_date.setCalendarPopup(True)
-        
-        self.end_date = QDateEdit(self)
-        # Установка конечной даты (текущая дата)
-        self.end_date.setDate(QDate.currentDate())
-        # Включение всплывающего календаря
-        self.end_date.setCalendarPopup(True)
-        
-        # Создание layout для фильтров
-        filters_layout = QVBoxLayout()
-        # Добавление элементов управления фильтрами
-        filters_layout.addWidget(QLabel("Период с:"))
-        filters_layout.addWidget(self.start_date)
-        filters_layout.addWidget(QLabel("по:"))
-        filters_layout.addWidget(self.end_date)
-        
-        # Добавление layout с фильтрами в основной layout
-        self.layout.addLayout(filters_layout)
     
     def setup_buttons(self):
         """Настройка кнопок отчетов"""
@@ -611,12 +422,12 @@ class SalesReportDialog(QDialog):
         buttons_layout = QVBoxLayout()
         
         # Создание и настройка кнопок для различных видов отчетов
-        self.sales_by_category_btn = QPushButton("Продажи по категориям")
+        self.sales_by_category_btn = QPushButton("Заказы по категориям")
         # Подключение обработчика нажатия кнопки
         self.sales_by_category_btn.clicked.connect(self.show_sales_by_category)
         buttons_layout.addWidget(self.sales_by_category_btn)
         
-        self.sales_by_month_btn = QPushButton("Продажи по месяцам")
+        self.sales_by_month_btn = QPushButton("Заказы по месяцам")
         self.sales_by_month_btn.clicked.connect(self.show_sales_by_month)
         buttons_layout.addWidget(self.sales_by_month_btn)
         
@@ -632,25 +443,20 @@ class SalesReportDialog(QDialog):
         self.layout.addLayout(buttons_layout)
     
     def show_sales_by_category(self):
-        """Отображение продаж по категориям"""
+        """Отображение заказов по категориям"""
         try:
-            # Получение выбранного периода
-            start_date = self.start_date.date().toString("yyyy-MM-dd")
-            end_date = self.end_date.date().toString("yyyy-MM-dd")
-            
-            # SQL-запрос для получения данных о продажах по категориям
+            # SQL-запрос для получения данных о заказах по категориям
             query = """
                 SELECT p.category, SUM(oi.total_price) as total_sales
                 FROM products p
                 JOIN order_items oi ON p.product_id = oi.product_id
                 JOIN orders o ON oi.order_id = o.order_id
-                WHERE o.order_date BETWEEN %s AND %s
                 GROUP BY p.category
                 ORDER BY total_sales DESC
             """
             
             # Выполнение запроса
-            result = self.db.fetch_all(query, (start_date, end_date), self)
+            result = self.db.fetch_all(query, (), self)
             
             # Проверка наличия результатов
             if not result:
@@ -665,31 +471,26 @@ class SalesReportDialog(QDialog):
             self.chart_widget.plot_pie_chart(
                 sales, 
                 categories, 
-                f"Продажи по категориям ({start_date} - {end_date})"
+                "Заказы по категориям"
             )
         except Exception as e:
-            # Логирование ошибки при отображении продаж по категориям
+            # Логирование ошибки при отображении заказов по категориям
             logging.error(f"Error showing sales by category: {str(e)}")
     
     def show_sales_by_month(self):
-        """Отображение продаж по месяцам"""
+        """Отображение заказов по месяцам"""
         try:
-            # Получение выбранного периода
-            start_date = self.start_date.date().toString("yyyy-MM-dd")
-            end_date = self.end_date.date().toString("yyyy-MM-dd")
-            
-            # SQL-запрос для получения данных о продажах по месяцам
+            # SQL-запрос для получения данных о заказах по месяцам
             query = """
                 SELECT TO_CHAR(o.order_date, 'YYYY-MM') as month, SUM(oi.total_price) as total_sales
                 FROM order_items oi
                 JOIN orders o ON oi.order_id = o.order_id
-                WHERE o.order_date BETWEEN %s AND %s
                 GROUP BY TO_CHAR(o.order_date, 'YYYY-MM')
                 ORDER BY month
             """
             
             # Выполнение запроса
-            result = self.db.fetch_all(query, (start_date, end_date), self)
+            result = self.db.fetch_all(query, (), self)
             
             # Проверка наличия результатов
             if not result:
@@ -704,33 +505,29 @@ class SalesReportDialog(QDialog):
             self.chart_widget.plot_line_chart(
                 months, 
                 sales, 
-                "Динамика продаж по месяцам", 
+                "Динамика заказов по месяцам", 
                 "Месяц", 
-                "Сумма продаж"
+                "Сумма заказов"
             )
         except Exception as e:
-            # Логирование ошибки при отображении продаж по месяцам
+            # Логирование ошибки при отображении заказов по месяцам
             logging.error(f"Error showing sales by month: {str(e)}")
     
     def show_sales_by_supplier(self):
         """Отображение поставок по поставщикам"""
         try:
-            # Получение выбранного периода
-            start_date = self.start_date.date().toString("yyyy-MM-dd")
-            end_date = self.end_date.date().toString("yyyy-MM-dd")
-            
             # SQL-запрос для получения данных о поставках по поставщикам
             query = """
                 SELECT s.supplier_name, SUM(o.total_amount) as total_orders
                 FROM suppliers s
                 JOIN orders o ON s.supplier_id = o.supplier_id
-                WHERE o.order_date BETWEEN %s AND %s AND o.status = 'доставлен'
+                WHERE o.status = 'доставлен'
                 GROUP BY s.supplier_name
                 ORDER BY total_orders DESC
             """
             
             # Выполнение запроса
-            result = self.db.fetch_all(query, (start_date, end_date), self)
+            result = self.db.fetch_all(query, (), self)
             
             # Проверка наличия результатов
             if not result:
@@ -745,7 +542,7 @@ class SalesReportDialog(QDialog):
             self.chart_widget.plot_bar_chart(
                 suppliers, 
                 orders, 
-                f"Поставки по поставщикам ({start_date} - {end_date})", 
+                "Поставки по поставщикам", 
                 "Поставщик", 
                 "Сумма заказов"
             )
@@ -754,12 +551,8 @@ class SalesReportDialog(QDialog):
             logging.error(f"Error showing sales by supplier: {str(e)}")
     
     def show_top_products(self):
-        """Отображение топ-продуктов по продажам"""
+        """Отображение топ-продуктов по заказам"""
         try:
-            # Получение выбранного периода
-            start_date = self.start_date.date().toString("yyyy-MM-dd")
-            end_date = self.end_date.date().toString("yyyy-MM-dd")
-            
             # Установка лимита по количеству товаров
             limit = 10
             
@@ -769,14 +562,13 @@ class SalesReportDialog(QDialog):
                 FROM products p
                 JOIN order_items oi ON p.product_id = oi.product_id
                 JOIN orders o ON oi.order_id = o.order_id
-                WHERE o.order_date BETWEEN %s AND %s
                 GROUP BY p.product_name
                 ORDER BY total_quantity DESC
                 LIMIT %s
             """
             
             # Выполнение запроса
-            result = self.db.fetch_all(query, (start_date, end_date, limit), self)
+            result = self.db.fetch_all(query, (limit,), self)
             
             # Проверка наличия результатов
             if not result:
@@ -791,7 +583,7 @@ class SalesReportDialog(QDialog):
             self.chart_widget.plot_bar_chart(
                 products, 
                 quantities, 
-                f"Топ-{limit} продаваемых товаров ({start_date} - {end_date})", 
+                f"Топ-{limit} заказываемых товаров", 
                 "Товар", 
                 "Количество"
             )

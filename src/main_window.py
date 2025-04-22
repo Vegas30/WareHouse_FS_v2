@@ -12,7 +12,7 @@ from tabs.suppliers_tab import SuppliersTab
 from tabs.warehouses_tab import WarehousesTab
 # Импорт стилей приложения
 from styles import APP_STYLESHEET
-from visualization import InventoryAnalysisDialog, SalesReportDialog
+from visualization import InventoryAnalysisDialog, OrdersReportDialog
 from data_export import DataExporter, DataImporter
 
 # Основной класс приложения, наследующий от QMainWindow
@@ -91,7 +91,7 @@ class WarehouseApp(QMainWindow):
         inventory_report_action = reports_menu.addAction("Анализ запасов")
         inventory_report_action.triggered.connect(self.show_inventory_analysis)
         
-        sales_report_action = reports_menu.addAction("Отчеты по продажам")
+        sales_report_action = reports_menu.addAction("Отчеты по заказам")
         sales_report_action.triggered.connect(self.show_sales_report)
         
         # Меню "Справка"
@@ -172,10 +172,10 @@ class WarehouseApp(QMainWindow):
         # Определяем таблицу на основе текущей вкладки
         if current_tab_index == 0:  # Товары
             table_name = "products"
-        elif current_tab_index == 1:  # Запасы
-            table_name = "stock"
-        elif current_tab_index == 2:  # Заказы
-            table_name = "orders"
+        # elif current_tab_index == 1:  # Запасы
+        #     table_name = "stock"
+        # elif current_tab_index == 2:  # Заказы
+        #     table_name = "orders"
         elif current_tab_index == 3:  # Поставщики
             table_name = "suppliers"
         elif current_tab_index == 4:  # Склады
@@ -188,7 +188,7 @@ class WarehouseApp(QMainWindow):
             # Обновляем данные на текущей вкладке
             self.refresh_current_tab()
         else:
-            QMessageBox.warning(self, "Импорт данных", "Не удалось определить таблицу для импорта")
+            QMessageBox.warning(self, "Импорт данных", "Импорт данных не поддерживается для этой вкладки")
     
     def import_from_excel(self):
         """Импорт данных из Excel файла."""
@@ -198,10 +198,10 @@ class WarehouseApp(QMainWindow):
         # Определяем таблицу на основе текущей вкладки
         if current_tab_index == 0:  # Товары
             table_name = "products"
-        elif current_tab_index == 1:  # Запасы
-            table_name = "stock"
-        elif current_tab_index == 2:  # Заказы
-            table_name = "orders"
+        # elif current_tab_index == 1:  # Запасы
+        #     table_name = "stock"
+        # elif current_tab_index == 2:  # Заказы
+        #     table_name = "orders"
         elif current_tab_index == 3:  # Поставщики
             table_name = "suppliers"
         elif current_tab_index == 4:  # Склады
@@ -214,7 +214,7 @@ class WarehouseApp(QMainWindow):
             # Обновляем данные на текущей вкладке
             self.refresh_current_tab()
         else:
-            QMessageBox.warning(self, "Импорт данных", "Не удалось определить таблицу для импорта")
+            QMessageBox.warning(self, "Импорт данных", "Импорт данных не поддерживается для этой вкладки")
     
     def export_to_csv(self):
         """Экспорт данных в CSV файл."""
@@ -370,9 +370,9 @@ class WarehouseApp(QMainWindow):
         dialog.exec()
     
     def show_sales_report(self):
-        """Показать диалог отчетов по продажам."""
+        """Показать диалог отчетов по заказам."""
         # Создание и отображение диалога отчетов по продажам
-        dialog = SalesReportDialog(self)
+        dialog = OrdersReportDialog(self)
         dialog.exec()
     
     def refresh_current_tab(self):

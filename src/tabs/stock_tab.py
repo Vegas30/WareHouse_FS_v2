@@ -89,6 +89,8 @@ class StockTab(QWidget):
         self.stock_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         # Настройка автоматического изменения размера строк
         self.stock_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        # Подключение обработчика клика по заголовку таблицы для сортировки
+        self.stock_table.horizontalHeader().sectionClicked.connect(self.header_clicked)
 
         # Создание нижней панели с дополнительными функциями
         bottom_panel = QHBoxLayout()
@@ -746,6 +748,37 @@ class StockTab(QWidget):
         super().showEvent(event)
         # Проверка низкого уровня запасов при показе вкладки
         self.check_low_stock_alert()
+
+    def header_clicked(self, logical_index):
+        """Обработчик клика по заголовку таблицы для сортировки"""
+        # Сортировка по количеству (индекс столбца 3)
+        if logical_index == 3:  # Колонка "Количество"
+            # Получение текущих данных из таблицы
+            data = []
+            for row in range(self.stock_table.rowCount()):
+                row_data = []
+                for col in range(self.stock_table.columnCount()):
+                    item = self.stock_table.item(row, col)
+                    if item:
+                        row_data.append(item.text())
+                    else:
+                        row_data.append("")
+                data.append(row_data)
+            
+            # Сортировка данных по количеству (в обратном порядке)
+            data.sort(key=lambda x: int(x[3]), reverse=False)
+            
+            # Обновление таблицы отсортированными данными
+            for row, row_data in enumerate(data):
+                for col, cell_data in enumerate(row_data):
+                    item = QTableWidgetItem(cell_data)
+                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    
+                    # Подсветка товаров с низким запасом
+                    if col == 3 and int(cell_data) < 10:
+                        item.setForeground(Qt.GlobalColor.red)
+                        
+                    self.stock_table.setItem(row, col, item)
 
 
 class AddStockDialog(QDialog):
