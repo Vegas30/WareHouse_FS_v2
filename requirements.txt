@@ -1,0 +1,10 @@
+# Основные зависимости
+PyQt6>=6.4.0
+psycopg2>=2.9.5
+matplotlib>=3.6.2
+pandas>=1.5.2
+numpy>=1.23.5
+reportlab>=3.6.12
+
+# Для сборки приложения
+pyinstaller>=5.7.0 
