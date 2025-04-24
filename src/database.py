@@ -13,6 +13,9 @@ import psycopg2
 import logging
 # Импорт необходимых виджетов из PyQt6
 from PyQt6.QtWidgets import QMessageBox
+# Импорт для работы с конфигурационным файлом
+import configparser
+import os
 
 class Database:
     """
@@ -27,11 +30,16 @@ class Database:
         Инициализация соединения с базой данных.
         
         Создает соединение с базой данных PostgreSQL используя
-        заданные параметры подключения.
+        параметры подключения из конфигурационного файла.
         
         :raises: Exception при ошибке подключения к базе данных
         """
         try:
+            # Загрузка параметров из config.ini
+            config = configparser.ConfigParser()
+            config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.ini')
+            config.read(config_path)
+            
             # Установка соединения с базой данных PostgreSQL
             self.conn = psycopg2.connect(
                 dbname="test_db",  # Имя базы данных

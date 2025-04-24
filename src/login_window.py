@@ -52,7 +52,7 @@ class LoginWindow(QWidget):
         # Установка фиксированного размера окна
         self.setFixedSize(500, 600)
         # Установка иконки окна
-        self.setWindowIcon(QIcon("src/logo.png"))
+        self.setWindowIcon(QIcon("src/images/logo.png"))
         # Установка имени объекта для стилизации
         self.setObjectName("loginWidget")
         # Настройка фона
@@ -83,8 +83,8 @@ class LoginWindow(QWidget):
 
         # Создание и настройка логотипа
         self.logo = QLabel()
-        if os.path.exists("src/logo.png"):
-            pixmap = QPixmap("src/logo.png")
+        if os.path.exists("src/images/logo.png"):
+            pixmap = QPixmap("src/images/logo.png")
             self.logo.setPixmap(pixmap.scaled(180, 180, 
                                               Qt.AspectRatioMode.KeepAspectRatio,
                                               Qt.TransformationMode.SmoothTransformation))

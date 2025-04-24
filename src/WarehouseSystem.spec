@@ -1,32 +1,22 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-import os
 
 a = Analysis(
     ['main.py'],
-    pathex=[],
+    pathex=['.','src','src/tabs','fonts','images'],
     binaries=[],
-    datas=[
-        # Добавление ресурсов, шрифтов и других файлов
-        ('fonts', 'fonts'),
-        ('resources', 'resources')
-    ],
-    hiddenimports=[
-        'main_window',
-        'login_window',
-        'auth_service',
-        'database',
-        'styles',
-        'dialogs',
-        'visualization',
-        'data_export',
-        'validators',
-        'tabs.products_tab',
-        'tabs.stock_tab',
-        'tabs.orders_tab',
-        'tabs.suppliers_tab',
-        'tabs.warehouses_tab'
-    ],
+    datas=[],
+    hidden_imports = [
+    'main_window',
+    'login_window',
+    'auth_service',
+    'database',
+    'styles',
+    'dialogs',
+    'visualization',
+    'data_export',
+    'validators'
+],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
